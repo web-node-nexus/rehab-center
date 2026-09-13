@@ -1,0 +1,12 @@
+node_modules/
+uploads/profiles/*
+uploads/reports/*
+uploads/prescriptions/*
+uploads/exports/*
+!uploads/profiles/.gitkeep
+!uploads/reports/.gitkeep
+!uploads/prescriptions/.gitkeep
+!uploads/exports/.gitkeep
+.env
+*.log
+.DS_Store
