@@ -141,6 +141,14 @@ const Student = sequelize.define(
       type: DataTypes.DECIMAL(10, 2),
       allowNull: true,
     },
+    admission_fee: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+    },
+    duration_months: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+    },
     referred_by: {
       type: DataTypes.STRING(200),
       allowNull: true,

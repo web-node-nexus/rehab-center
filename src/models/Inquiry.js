@@ -21,6 +21,10 @@ const Inquiry = sequelize.define(
       type: DataTypes.STRING(30),
       allowNull: true,
     },
+    looking_for: {
+      type: DataTypes.STRING(120),
+      allowNull: true,
+    },
     inquiry_date: {
       type: DataTypes.DATEONLY,
       allowNull: false,

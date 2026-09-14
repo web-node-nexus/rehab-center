@@ -11,7 +11,21 @@ const {
 } = require('../models');
 const AppError = require('../utils/AppError');
 const { toPublicUrl, calcAge, parsePagination, success } = require('../utils/helpers');
-const { parseMoneyField, parseOptionalText, buildFeeLedger, toMoneyOrNull } = require('../utils/feeLedger');
+const { parseMoneyField, parseOptionalText, parseIntField, computeMonthlyFee, buildFeeLedger, toMoneyOrNull } = require('../utils/feeLedger');
+
+const applyFeeFields = (body, target) => {
+  if (body.agreed_fee !== undefined) target.agreed_fee = parseMoneyField(body.agreed_fee);
+  if (body.admission_fee !== undefined) target.admission_fee = parseMoneyField(body.admission_fee);
+  if (body.duration_months !== undefined) target.duration_months = parseIntField(body.duration_months);
+  if (body.monthly_fee !== undefined) target.monthly_fee = parseMoneyField(body.monthly_fee);
+
+  const total = target.agreed_fee !== undefined ? target.agreed_fee : undefined;
+  const admission = target.admission_fee !== undefined ? target.admission_fee : undefined;
+  const months = target.duration_months !== undefined ? target.duration_months : undefined;
+  if (total != null && months) {
+    target.monthly_fee = computeMonthlyFee(total, admission || 0, months);
+  }
+};
 
 const mapStudent = (student) => {
   const data = student.toJSON ? student.toJSON() : { ...student };
@@ -21,6 +35,9 @@ const mapStudent = (student) => {
   data.family_aadhar_image = toPublicUrl(data.family_aadhar_image);
   data.agreed_fee = toMoneyOrNull(data.agreed_fee);
   data.monthly_fee = toMoneyOrNull(data.monthly_fee);
+  data.admission_fee = toMoneyOrNull(data.admission_fee);
+  data.duration_months =
+    data.duration_months == null ? null : Number(data.duration_months) || null;
   if (data.initial_reports) {
     data.initial_reports = data.initial_reports.map((r) => ({
       ...r,
@@ -241,7 +258,15 @@ const createStudent = async (req, res, next) => {
       father_name: parseOptionalText(body.father_name),
       mother_name: parseOptionalText(body.mother_name),
       agreed_fee: parseMoneyField(body.agreed_fee) ?? null,
-      monthly_fee: parseMoneyField(body.monthly_fee) ?? null,
+      admission_fee: parseMoneyField(body.admission_fee) ?? null,
+      duration_months: parseIntField(body.duration_months) ?? null,
+      monthly_fee:
+        parseMoneyField(body.monthly_fee) ??
+        computeMonthlyFee(
+          parseMoneyField(body.agreed_fee),
+          parseMoneyField(body.admission_fee) ?? 0,
+          parseIntField(body.duration_months)
+        ),
       referred_by: body.referred_by || null,
       status: body.status || 'active',
       discharge_date: body.discharge_date || null,
@@ -299,8 +324,7 @@ const updateStudent = async (req, res, next) => {
 
     if (body.father_name !== undefined) updates.father_name = parseOptionalText(body.father_name);
     if (body.mother_name !== undefined) updates.mother_name = parseOptionalText(body.mother_name);
-    if (body.agreed_fee !== undefined) updates.agreed_fee = parseMoneyField(body.agreed_fee);
-    if (body.monthly_fee !== undefined) updates.monthly_fee = parseMoneyField(body.monthly_fee);
+    applyFeeFields(body, updates);
 
     if (req.file) {
       updates.profile_image = `uploads/profiles/${req.file.filename}`;

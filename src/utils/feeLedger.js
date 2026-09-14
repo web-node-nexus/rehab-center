@@ -26,6 +26,20 @@ const parseOptionalText = (value) => {
   return text.length ? text : null;
 };
 
+const parseIntField = (value) => {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+  const n = parseInt(value, 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+
+const computeMonthlyFee = (total, admission, months) => {
+  if (total == null || months == null || months <= 0) return null;
+  const rest = Number((total - (admission || 0)).toFixed(2));
+  if (rest < 0) return null;
+  return Number((rest / months).toFixed(2));
+};
+
 const buildFeeLedger = async (student) => {
   const now = new Date();
   const month = now.getMonth() + 1;
@@ -61,7 +75,13 @@ const buildFeeLedger = async (student) => {
     ]);
 
   const agreedFee = toMoneyOrNull(student.agreed_fee);
-  const monthlyFee = toMoneyOrNull(student.monthly_fee);
+  const admissionFee = toMoneyOrNull(student.admission_fee);
+  const durationMonths =
+    student.duration_months == null ? null : Number(student.duration_months) || null;
+  const packageAmount =
+    agreedFee == null ? null : Number(Math.max(0, agreedFee - (admissionFee || 0)).toFixed(2));
+  const monthlyFee =
+    toMoneyOrNull(student.monthly_fee) ?? computeMonthlyFee(agreedFee, admissionFee, durationMonths);
   const paid = toMoney(paymentTotal?.total);
   const thisMonthPaid = toMoney(thisMonthTotal?.total);
   const pickupCharges = toMoney(pickupCharged?.total);
@@ -69,6 +89,9 @@ const buildFeeLedger = async (student) => {
 
   return {
     agreedFee,
+    admissionFee,
+    durationMonths,
+    packageAmount,
     monthlyFee,
     paid,
     pending: agreedFee == null ? null : Number(Math.max(0, agreedFee - paid).toFixed(2)),
@@ -87,5 +110,7 @@ module.exports = {
   toMoneyOrNull,
   parseMoneyField,
   parseOptionalText,
+  parseIntField,
+  computeMonthlyFee,
   buildFeeLedger,
 };

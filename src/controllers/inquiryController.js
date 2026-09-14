@@ -16,6 +16,7 @@ const listInquiries = async (req, res, next) => {
         { name: { [Op.like]: q } },
         { phone: { [Op.like]: q } },
         { address: { [Op.like]: q } },
+        { looking_for: { [Op.like]: q } },
       ];
     }
 
@@ -51,6 +52,7 @@ const createInquiry = async (req, res, next) => {
       name: String(req.body.name).trim(),
       address: req.body.address || null,
       phone: req.body.phone || null,
+      looking_for: req.body.looking_for || null,
       inquiry_date: req.body.inquiry_date,
       notes: req.body.notes || null,
       added_by: req.user.id,
@@ -73,6 +75,10 @@ const updateInquiry = async (req, res, next) => {
     const updates = { ...req.body };
     delete updates.added_by;
     if (updates.name) updates.name = String(updates.name).trim();
+    if (updates.looking_for !== undefined) {
+      const text = String(updates.looking_for || '').trim();
+      updates.looking_for = text || null;
+    }
     await inquiry.update(updates);
 
     const full = await Inquiry.findByPk(inquiry.id, {

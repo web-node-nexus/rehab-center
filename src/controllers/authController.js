@@ -90,10 +90,28 @@ const changePassword = async (req, res, next) => {
   }
 };
 
+const verifyPasswordValidators = [
+  body('password').notEmpty().withMessage('Password is required'),
+];
+
+const verifyPassword = async (req, res, next) => {
+  try {
+    const user = await User.scope('withPassword').findByPk(req.user.id);
+    if (!user) throw new AppError('User not found', 401);
+    const match = await bcrypt.compare(String(req.body.password || ''), user.password);
+    if (!match) throw new AppError('Password is incorrect', 400);
+    return success(res, { verified: true });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   login,
   me,
   changePassword,
+  verifyPassword,
   loginValidators,
   changePasswordValidators,
+  verifyPasswordValidators,
 };
