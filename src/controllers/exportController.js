@@ -205,9 +205,8 @@ const exportStudentPdf = async (req, res, next) => {
     line(doc, 'Age', student.age != null ? `${student.age} years` : null);
     line(doc, 'Date of Birth', student.date_of_birth);
     line(doc, 'Gender', student.gender);
-    line(doc, 'Blood Group', student.blood_group);
     line(doc, 'Weight', student.weight != null ? `${student.weight} kg` : null);
-    line(doc, 'Height', student.height != null ? `${student.height} cm` : null);
+    line(doc, 'Scars / injury marks', student.scars_from_injury);
     line(doc, 'Phone', student.phone_number);
     line(doc, 'Alternate Phone', student.alternate_phone);
     line(doc, 'Address', student.address);
@@ -219,6 +218,13 @@ const exportStudentPdf = async (req, res, next) => {
     line(doc, 'Current Medications', student.current_medications);
     line(doc, 'Referred By', student.referred_by);
     line(doc, 'Notes', student.notes);
+
+    if (student.aadhar_image) {
+      doc.moveDown(0.3);
+      doc.font('Helvetica-Bold').fontSize(11).fillColor('#0F172A').text('Student Aadhaar');
+      drawEmbeddedImage(doc, student.aadhar_image, { fit: [240, 150], height: 150 });
+      linkLine(doc, 'Student Aadhaar URL', fileUrl(student.aadhar_image, baseUrl));
+    }
 
     if (student.discharge_image) {
       doc.moveDown(0.3);
@@ -232,6 +238,15 @@ const exportStudentPdf = async (req, res, next) => {
     line(doc, 'Relation', student.family_member_relation);
     line(doc, 'Family Phone', student.family_member_phone);
     line(doc, 'Family Address', student.family_member_address);
+    if (student.family_aadhar_image) {
+      doc.moveDown(0.3);
+      doc.font('Helvetica-Bold').fontSize(11).fillColor('#0F172A').text('Family Aadhaar');
+      drawEmbeddedImage(doc, student.family_aadhar_image, { fit: [240, 150], height: 150 });
+      linkLine(doc, 'Family Aadhaar URL', fileUrl(student.family_aadhar_image, baseUrl));
+    }
+    line(doc, 'Visitor Name', student.visiting_name);
+    line(doc, 'Visitor Address', student.visiting_address);
+    line(doc, 'Visitor Mobile', student.visiting_phone);
     line(doc, 'Emergency Contact', student.emergency_contact_name);
     line(doc, 'Emergency Relation', student.emergency_contact_relation);
     line(doc, 'Emergency Phone', student.emergency_contact_phone);
@@ -402,6 +417,8 @@ const exportStudentPdf = async (req, res, next) => {
     };
 
     pushIndex('Student profile photo', student.profile_image);
+    pushIndex('Student Aadhaar', student.aadhar_image);
+    pushIndex('Family Aadhaar', student.family_aadhar_image);
     pushIndex('Discharge photo', student.discharge_image);
     initialReports.forEach((r, i) => pushIndex(`Initial report ${i + 1}: ${r.report_title}`, r.pdf_file));
     monthlyRecords.forEach((r, i) =>

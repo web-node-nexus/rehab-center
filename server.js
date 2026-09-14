@@ -17,6 +17,8 @@ const dashboardRoutes = require('./src/routes/dashboardRoutes');
 const paymentRoutes = require('./src/routes/paymentRoutes');
 const familyMeetingRoutes = require('./src/routes/familyMeetingRoutes');
 const monthlyPhotoRoutes = require('./src/routes/monthlyPhotoRoutes');
+const inquiryRoutes = require('./src/routes/inquiryRoutes');
+const pickupRoutes = require('./src/routes/pickupRoutes');
 
 const app = express();
 
@@ -36,6 +38,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api', paymentRoutes);
 app.use('/api', familyMeetingRoutes);
 app.use('/api', monthlyPhotoRoutes);
+app.use('/api', inquiryRoutes);
+app.use('/api', pickupRoutes);
 app.use('/api', initialReportRoutes);
 app.use('/api', monthlyRecordRoutes);
 app.use('/api', doctorVisitRoutes);

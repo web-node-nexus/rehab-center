@@ -2,13 +2,9 @@ const { Op, fn, col } = require('sequelize');
 const { Payment, Student, User } = require('../models');
 const AppError = require('../utils/AppError');
 const { toPublicUrl, parsePagination, success } = require('../utils/helpers');
+const { toMoney, buildFeeLedger } = require('../utils/feeLedger');
 
 const METHODS = ['cash', 'upi', 'bank', 'card', 'other'];
-
-const toMoney = (value) => {
-  const n = Number(value);
-  return Number.isFinite(n) ? Number(n.toFixed(2)) : 0;
-};
 
 const mapPayment = (row) => {
   const data = row.toJSON ? row.toJSON() : { ...row };
@@ -43,7 +39,7 @@ const parsePeriod = (body, fallbackDate) => {
 
 const listStudentPayments = async (req, res, next) => {
   try {
-    await requireStudent(req.params.studentId);
+    const student = await requireStudent(req.params.studentId);
     const { page, limit, offset } = parsePagination(req.query);
     const where = { student_id: req.params.studentId };
     if (req.query.month) where.for_month = parseInt(req.query.month, 10);
@@ -88,6 +84,7 @@ const listStudentPayments = async (req, res, next) => {
         totals: {
           allTime: toMoney(allTime?.total),
           selectedPeriod: toMoney(thisMonth?.total),
+          ledger: await buildFeeLedger(student),
         },
       }
     );

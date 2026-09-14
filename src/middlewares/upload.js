@@ -94,8 +94,13 @@ const uploadDischargeImage = multer({
 const uploadStudentWithReports = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
-      const isImage = file.fieldname === 'profile_image';
-      const sub = isImage ? 'profiles' : 'reports';
+      let sub = 'reports';
+      if (file.fieldname === 'profile_image' || file.fieldname === 'discharge_image') {
+        sub = 'profiles';
+      }
+      if (file.fieldname === 'aadhar_image' || file.fieldname === 'family_aadhar_image') {
+        sub = 'aadhar';
+      }
       const dest = path.join(__dirname, '../../uploads', sub);
       ensureDir(dest);
       cb(null, dest);
@@ -107,13 +112,21 @@ const uploadStudentWithReports = multer({
     },
   }),
   fileFilter: (req, file, cb) => {
-    if (file.fieldname === 'profile_image') return imageFilter(req, file, cb);
+    if (
+      ['profile_image', 'aadhar_image', 'family_aadhar_image', 'discharge_image'].includes(
+        file.fieldname
+      )
+    ) {
+      return imageFilter(req, file, cb);
+    }
     if (file.fieldname === 'initial_reports') return pdfFilter(req, file, cb);
     return cb(new AppError('Unexpected file field', 400), false);
   },
   limits: { fileSize: 15 * 1024 * 1024 },
 }).fields([
   { name: 'profile_image', maxCount: 1 },
+  { name: 'aadhar_image', maxCount: 1 },
+  { name: 'family_aadhar_image', maxCount: 1 },
   { name: 'initial_reports', maxCount: 10 },
 ]);
 

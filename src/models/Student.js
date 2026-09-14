@@ -33,6 +33,10 @@ const Student = sequelize.define(
       type: DataTypes.DECIMAL(6, 2),
       allowNull: true,
     },
+    scars_from_injury: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
     height: {
       type: DataTypes.DECIMAL(6, 2),
       allowNull: true,
@@ -51,6 +55,10 @@ const Student = sequelize.define(
     },
     address: {
       type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    aadhar_image: {
+      type: DataTypes.STRING(500),
       allowNull: true,
     },
     date_of_joining: {
@@ -99,6 +107,38 @@ const Student = sequelize.define(
     },
     family_member_address: {
       type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    family_aadhar_image: {
+      type: DataTypes.STRING(500),
+      allowNull: true,
+    },
+    visiting_name: {
+      type: DataTypes.STRING(120),
+      allowNull: true,
+    },
+    visiting_address: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    visiting_phone: {
+      type: DataTypes.STRING(30),
+      allowNull: true,
+    },
+    father_name: {
+      type: DataTypes.STRING(120),
+      allowNull: true,
+    },
+    mother_name: {
+      type: DataTypes.STRING(120),
+      allowNull: true,
+    },
+    agreed_fee: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+    },
+    monthly_fee: {
+      type: DataTypes.DECIMAL(10, 2),
       allowNull: true,
     },
     referred_by: {

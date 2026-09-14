@@ -20,10 +20,10 @@ const {
   listMonthlyPhotos,
   createMonthlyPhoto,
 } = require('../controllers/monthlyPhotoController');
+const { listPickups, createPickup } = require('../controllers/pickupController');
 const { authenticate } = require('../middlewares/auth');
 const {
   uploadStudentWithReports,
-  uploadProfileImage,
   uploadDischargeImage,
   uploadReceiptImage,
   uploadMonthlyPhoto,
@@ -40,11 +40,13 @@ router.get('/:studentId/family-meetings', listFamilyMeetings);
 router.post('/:studentId/family-meetings', createFamilyMeeting);
 router.get('/:studentId/monthly-photos', listMonthlyPhotos);
 router.post('/:studentId/monthly-photos', uploadMonthlyPhoto, createMonthlyPhoto);
+router.get('/:studentId/pickups', listPickups);
+router.post('/:studentId/pickups', createPickup);
 router.get('/:id/export-pdf', exportStudentPdf);
 router.get('/:id', getStudent);
 router.post('/', uploadStudentWithReports, createStudent);
 router.post('/:id/discharge', uploadDischargeImage, dischargeStudent);
-router.put('/:id', uploadProfileImage, updateStudent);
+router.put('/:id', uploadStudentWithReports, updateStudent);
 router.delete('/:id', deleteStudent);
 
 module.exports = router;

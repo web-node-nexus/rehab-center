@@ -6,6 +6,8 @@ const DoctorVisit = require('./DoctorVisit');
 const Payment = require('./Payment');
 const FamilyMeeting = require('./FamilyMeeting');
 const MonthlyPhoto = require('./MonthlyPhoto');
+const Inquiry = require('./Inquiry');
+const Pickup = require('./Pickup');
 
 Student.hasMany(InitialReport, {
   foreignKey: 'student_id',
@@ -59,6 +61,18 @@ MonthlyPhoto.belongsTo(Student, { foreignKey: 'student_id', as: 'student' });
 MonthlyPhoto.belongsTo(User, { foreignKey: 'added_by', as: 'addedByUser' });
 User.hasMany(MonthlyPhoto, { foreignKey: 'added_by', as: 'monthly_photos' });
 
+Inquiry.belongsTo(User, { foreignKey: 'added_by', as: 'addedByUser' });
+User.hasMany(Inquiry, { foreignKey: 'added_by', as: 'inquiries' });
+
+Student.hasMany(Pickup, {
+  foreignKey: 'student_id',
+  as: 'pickups',
+  onDelete: 'CASCADE',
+});
+Pickup.belongsTo(Student, { foreignKey: 'student_id', as: 'student' });
+Pickup.belongsTo(User, { foreignKey: 'added_by', as: 'addedByUser' });
+User.hasMany(Pickup, { foreignKey: 'added_by', as: 'pickups' });
+
 module.exports = {
   User,
   Student,
@@ -68,4 +82,6 @@ module.exports = {
   Payment,
   FamilyMeeting,
   MonthlyPhoto,
+  Inquiry,
+  Pickup,
 };

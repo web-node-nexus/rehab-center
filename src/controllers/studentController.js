@@ -1,4 +1,4 @@
-const { Op, fn, col } = require('sequelize');
+const { Op } = require('sequelize');
 const {
   Student,
   InitialReport,
@@ -7,14 +7,20 @@ const {
   Payment,
   FamilyMeeting,
   MonthlyPhoto,
+  Pickup,
 } = require('../models');
 const AppError = require('../utils/AppError');
 const { toPublicUrl, calcAge, parsePagination, success } = require('../utils/helpers');
+const { parseMoneyField, parseOptionalText, buildFeeLedger, toMoneyOrNull } = require('../utils/feeLedger');
 
 const mapStudent = (student) => {
   const data = student.toJSON ? student.toJSON() : { ...student };
   data.profile_image = toPublicUrl(data.profile_image);
   data.discharge_image = toPublicUrl(data.discharge_image);
+  data.aadhar_image = toPublicUrl(data.aadhar_image);
+  data.family_aadhar_image = toPublicUrl(data.family_aadhar_image);
+  data.agreed_fee = toMoneyOrNull(data.agreed_fee);
+  data.monthly_fee = toMoneyOrNull(data.monthly_fee);
   if (data.initial_reports) {
     data.initial_reports = data.initial_reports.map((r) => ({
       ...r,
@@ -106,12 +112,19 @@ const getStudent = async (req, res, next) => {
           ],
           limit: 12,
         },
+        {
+          model: Pickup,
+          as: 'pickups',
+          separate: true,
+          order: [['form_date', 'DESC'], ['created_at', 'DESC']],
+          limit: 10,
+        },
       ],
     });
 
     if (!student) throw new AppError('Student not found', 404);
 
-    const [initialCount, monthlyCount, visitCount, paymentCount, meetingCount, photoCount, paymentTotal] =
+    const [initialCount, monthlyCount, visitCount, paymentCount, meetingCount, photoCount, feeLedger] =
       await Promise.all([
         InitialReport.count({ where: { student_id: student.id } }),
         MonthlyRecord.count({ where: { student_id: student.id } }),
@@ -119,23 +132,8 @@ const getStudent = async (req, res, next) => {
         Payment.count({ where: { student_id: student.id } }),
         FamilyMeeting.count({ where: { student_id: student.id } }),
         MonthlyPhoto.count({ where: { student_id: student.id } }),
-        Payment.findOne({
-          attributes: [[fn('SUM', col('amount')), 'total']],
-          where: { student_id: student.id },
-          raw: true,
-        }),
+        buildFeeLedger(student),
       ]);
-
-    const now = new Date();
-    const thisMonthTotal = await Payment.findOne({
-      attributes: [[fn('SUM', col('amount')), 'total']],
-      where: {
-        student_id: student.id,
-        for_month: now.getMonth() + 1,
-        for_year: now.getFullYear(),
-      },
-      raw: true,
-    });
 
     const data = mapStudent(student);
     data.counts = {
@@ -145,11 +143,13 @@ const getStudent = async (req, res, next) => {
       payments: paymentCount,
       family_meetings: meetingCount,
       monthly_photos: photoCount,
+      pickups: feeLedger.pickupCount,
     };
     data.payment_totals = {
-      allTime: Number(paymentTotal?.total || 0),
-      thisMonth: Number(thisMonthTotal?.total || 0),
+      allTime: feeLedger.paid,
+      thisMonth: feeLedger.thisMonthPaid,
     };
+    data.fee_ledger = feeLedger;
 
     if (data.monthly_records) {
       data.monthly_records = data.monthly_records.map((r) => ({
@@ -178,6 +178,15 @@ const getStudent = async (req, res, next) => {
         photo: toPublicUrl(p.photo),
       }));
     }
+    if (data.pickups) {
+      data.pickups = data.pickups.map((p) => ({
+        ...p,
+        pickup_charges: Number(p.pickup_charges || 0),
+        monthly_rehab_charges:
+          p.monthly_rehab_charges == null ? null : Number(p.monthly_rehab_charges),
+        is_paid: Boolean(p.is_paid),
+      }));
+    }
 
     return success(res, data);
   } catch (err) {
@@ -193,22 +202,23 @@ const createStudent = async (req, res, next) => {
     }
 
     const age = body.age ? parseInt(body.age, 10) : calcAge(body.date_of_birth);
-    let profileImage = null;
-    if (req.files?.profile_image?.[0]) {
-      profileImage = `uploads/profiles/${req.files.profile_image[0].filename}`;
-    } else if (req.file) {
+    const filePath = (field, folder) =>
+      req.files?.[field]?.[0] ? `uploads/${folder}/${req.files[field][0].filename}` : null;
+
+    let profileImage = filePath('profile_image', 'profiles');
+    if (!profileImage && req.file) {
       profileImage = `uploads/profiles/${req.file.filename}`;
     }
 
     const student = await Student.create({
       full_name: body.full_name.trim(),
       profile_image: profileImage,
+      aadhar_image: filePath('aadhar_image', 'aadhar'),
       date_of_birth: body.date_of_birth || null,
       age,
       gender: body.gender || null,
       weight: body.weight || null,
-      height: body.height || null,
-      blood_group: body.blood_group || null,
+      scars_from_injury: body.scars_from_injury || null,
       phone_number: body.phone_number || null,
       alternate_phone: body.alternate_phone || null,
       address: body.address || null,
@@ -224,6 +234,14 @@ const createStudent = async (req, res, next) => {
       family_member_relation: body.family_member_relation || null,
       family_member_phone: body.family_member_phone || null,
       family_member_address: body.family_member_address || null,
+      family_aadhar_image: filePath('family_aadhar_image', 'aadhar'),
+      visiting_name: body.visiting_name || null,
+      visiting_address: body.visiting_address || null,
+      visiting_phone: body.visiting_phone || null,
+      father_name: parseOptionalText(body.father_name),
+      mother_name: parseOptionalText(body.mother_name),
+      agreed_fee: parseMoneyField(body.agreed_fee) ?? null,
+      monthly_fee: parseMoneyField(body.monthly_fee) ?? null,
       referred_by: body.referred_by || null,
       status: body.status || 'active',
       discharge_date: body.discharge_date || null,
@@ -272,15 +290,30 @@ const updateStudent = async (req, res, next) => {
     }
     if (body.age) updates.age = parseInt(body.age, 10);
 
-    if (req.file) {
-      updates.profile_image = `uploads/profiles/${req.file.filename}`;
-    } else if (req.files?.profile_image?.[0]) {
-      updates.profile_image = `uploads/profiles/${req.files.profile_image[0].filename}`;
-    }
-
-    // Remove non-model fields
     delete updates.initial_report_meta;
     delete updates.initial_reports;
+    delete updates.profile_image;
+    delete updates.aadhar_image;
+    delete updates.family_aadhar_image;
+    delete updates.discharge_image;
+
+    if (body.father_name !== undefined) updates.father_name = parseOptionalText(body.father_name);
+    if (body.mother_name !== undefined) updates.mother_name = parseOptionalText(body.mother_name);
+    if (body.agreed_fee !== undefined) updates.agreed_fee = parseMoneyField(body.agreed_fee);
+    if (body.monthly_fee !== undefined) updates.monthly_fee = parseMoneyField(body.monthly_fee);
+
+    if (req.file) {
+      updates.profile_image = `uploads/profiles/${req.file.filename}`;
+    }
+    if (req.files?.profile_image?.[0]) {
+      updates.profile_image = `uploads/profiles/${req.files.profile_image[0].filename}`;
+    }
+    if (req.files?.aadhar_image?.[0]) {
+      updates.aadhar_image = `uploads/aadhar/${req.files.aadhar_image[0].filename}`;
+    }
+    if (req.files?.family_aadhar_image?.[0]) {
+      updates.family_aadhar_image = `uploads/aadhar/${req.files.family_aadhar_image[0].filename}`;
+    }
 
     await student.update(updates);
     return success(res, mapStudent(student));
