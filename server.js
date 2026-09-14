@@ -14,6 +14,9 @@ const initialReportRoutes = require('./src/routes/initialReportRoutes');
 const monthlyRecordRoutes = require('./src/routes/monthlyRecordRoutes');
 const doctorVisitRoutes = require('./src/routes/doctorVisitRoutes');
 const dashboardRoutes = require('./src/routes/dashboardRoutes');
+const paymentRoutes = require('./src/routes/paymentRoutes');
+const familyMeetingRoutes = require('./src/routes/familyMeetingRoutes');
+const monthlyPhotoRoutes = require('./src/routes/monthlyPhotoRoutes');
 
 const app = express();
 
@@ -30,10 +33,13 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
-app.use('/api/students', studentRoutes);
+app.use('/api', paymentRoutes);
+app.use('/api', familyMeetingRoutes);
+app.use('/api', monthlyPhotoRoutes);
 app.use('/api', initialReportRoutes);
 app.use('/api', monthlyRecordRoutes);
 app.use('/api', doctorVisitRoutes);
+app.use('/api/students', studentRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 
 app.use(notFound);

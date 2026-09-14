@@ -1,5 +1,13 @@
-const { Op } = require('sequelize');
-const { Student, InitialReport, MonthlyRecord, DoctorVisit } = require('../models');
+const { Op, fn, col } = require('sequelize');
+const {
+  Student,
+  InitialReport,
+  MonthlyRecord,
+  DoctorVisit,
+  Payment,
+  FamilyMeeting,
+  MonthlyPhoto,
+} = require('../models');
 const AppError = require('../utils/AppError');
 const { toPublicUrl, calcAge, parsePagination, success } = require('../utils/helpers');
 
@@ -75,22 +83,72 @@ const getStudent = async (req, res, next) => {
           order: [['visit_date', 'DESC']],
           limit: 20,
         },
+        {
+          model: Payment,
+          as: 'payments',
+          separate: true,
+          order: [['payment_date', 'DESC']],
+          limit: 20,
+        },
+        {
+          model: FamilyMeeting,
+          as: 'family_meetings',
+          separate: true,
+          order: [['meeting_date', 'ASC']],
+        },
+        {
+          model: MonthlyPhoto,
+          as: 'monthly_photos',
+          separate: true,
+          order: [
+            ['year', 'DESC'],
+            ['month', 'DESC'],
+          ],
+          limit: 12,
+        },
       ],
     });
 
     if (!student) throw new AppError('Student not found', 404);
 
-    const [initialCount, monthlyCount, visitCount] = await Promise.all([
-      InitialReport.count({ where: { student_id: student.id } }),
-      MonthlyRecord.count({ where: { student_id: student.id } }),
-      DoctorVisit.count({ where: { student_id: student.id } }),
-    ]);
+    const [initialCount, monthlyCount, visitCount, paymentCount, meetingCount, photoCount, paymentTotal] =
+      await Promise.all([
+        InitialReport.count({ where: { student_id: student.id } }),
+        MonthlyRecord.count({ where: { student_id: student.id } }),
+        DoctorVisit.count({ where: { student_id: student.id } }),
+        Payment.count({ where: { student_id: student.id } }),
+        FamilyMeeting.count({ where: { student_id: student.id } }),
+        MonthlyPhoto.count({ where: { student_id: student.id } }),
+        Payment.findOne({
+          attributes: [[fn('SUM', col('amount')), 'total']],
+          where: { student_id: student.id },
+          raw: true,
+        }),
+      ]);
+
+    const now = new Date();
+    const thisMonthTotal = await Payment.findOne({
+      attributes: [[fn('SUM', col('amount')), 'total']],
+      where: {
+        student_id: student.id,
+        for_month: now.getMonth() + 1,
+        for_year: now.getFullYear(),
+      },
+      raw: true,
+    });
 
     const data = mapStudent(student);
     data.counts = {
       initial_reports: initialCount,
       monthly_records: monthlyCount,
       doctor_visits: visitCount,
+      payments: paymentCount,
+      family_meetings: meetingCount,
+      monthly_photos: photoCount,
+    };
+    data.payment_totals = {
+      allTime: Number(paymentTotal?.total || 0),
+      thisMonth: Number(thisMonthTotal?.total || 0),
     };
 
     if (data.monthly_records) {
@@ -104,6 +162,20 @@ const getStudent = async (req, res, next) => {
         ...v,
         prescription_pdf: toPublicUrl(v.prescription_pdf),
         prescription_image: toPublicUrl(v.prescription_image),
+        checkup_report: toPublicUrl(v.checkup_report),
+      }));
+    }
+    if (data.payments) {
+      data.payments = data.payments.map((p) => ({
+        ...p,
+        amount: Number(p.amount || 0),
+        receipt_image: toPublicUrl(p.receipt_image),
+      }));
+    }
+    if (data.monthly_photos) {
+      data.monthly_photos = data.monthly_photos.map((p) => ({
+        ...p,
+        photo: toPublicUrl(p.photo),
       }));
     }
 

@@ -61,6 +61,10 @@ const DoctorVisit = sequelize.define(
       type: DataTypes.STRING(500),
       allowNull: true,
     },
+    checkup_report: {
+      type: DataTypes.STRING(500),
+      allowNull: true,
+    },
     next_visit_date: {
       type: DataTypes.DATEONLY,
       allowNull: true,

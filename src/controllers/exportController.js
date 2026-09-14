@@ -1,7 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const PDFDocument = require('pdfkit');
-const { Student, InitialReport, MonthlyRecord, DoctorVisit, User } = require('../models');
+const { Student, InitialReport, MonthlyRecord, DoctorVisit, User, Payment, FamilyMeeting, MonthlyPhoto } = require('../models');
 const AppError = require('../utils/AppError');
 const env = require('../config/env');
 const { toPublicUrl } = require('../utils/helpers');
@@ -123,7 +123,8 @@ const exportStudentPdf = async (req, res, next) => {
 
     const baseUrl = baseUrlFromReq(req);
 
-    const [initialReports, monthlyRecords, doctorVisits] = await Promise.all([
+    const [initialReports, monthlyRecords, doctorVisits, payments, familyMeetings, monthlyPhotos] =
+      await Promise.all([
       InitialReport.findAll({
         where: { student_id: student.id },
         order: [['uploaded_at', 'DESC']],
@@ -137,6 +138,21 @@ const exportStudentPdf = async (req, res, next) => {
         where: { student_id: student.id },
         include: [{ model: User, as: 'doctor', attributes: ['id', 'name', 'role'] }],
         order: [['visit_date', 'DESC'], ['created_at', 'DESC']],
+      }),
+      Payment.findAll({
+        where: { student_id: student.id },
+        include: [{ model: User, as: 'receivedByUser', attributes: ['id', 'name'] }],
+        order: [['payment_date', 'DESC'], ['created_at', 'DESC']],
+      }),
+      FamilyMeeting.findAll({
+        where: { student_id: student.id },
+        include: [{ model: User, as: 'addedByUser', attributes: ['id', 'name'] }],
+        order: [['meeting_date', 'ASC'], ['meeting_no', 'ASC']],
+      }),
+      MonthlyPhoto.findAll({
+        where: { student_id: student.id },
+        include: [{ model: User, as: 'addedByUser', attributes: ['id', 'name'] }],
+        order: [['year', 'DESC'], ['month', 'DESC']],
       }),
     ]);
 
@@ -300,12 +316,76 @@ const exportStudentPdf = async (req, res, next) => {
           drawEmbeddedImage(doc, v.prescription_image, { fit: [160, 160], height: 160 });
           linkLine(doc, 'Prescription image URL', fileUrl(v.prescription_image, baseUrl));
         }
+        if (v.checkup_report) {
+          linkLine(doc, 'Checkup report PDF URL', fileUrl(v.checkup_report, baseUrl));
+        }
         doc.moveDown(0.35);
       });
     }
 
+    const paymentTotal = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    sectionTitle(doc, `6. Payments (₹${paymentTotal.toLocaleString('en-IN')})`);
+    if (!payments.length) {
+      doc.font('Helvetica').fontSize(10).fillColor('#64748B').text('No payments recorded.');
+    } else {
+      payments.forEach((p, i) => {
+        ensureSpace(doc, 90);
+        const period = `${MONTHS[(p.for_month || 1) - 1]} ${p.for_year}`;
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(11)
+          .fillColor('#0F172A')
+          .text(`${i + 1}. ₹${Number(p.amount || 0).toLocaleString('en-IN')} — ${p.payment_date}`);
+        line(doc, 'For month', period);
+        line(doc, 'Method', p.method);
+        line(doc, 'Receipt no', p.receipt_no);
+        line(doc, 'Received by', p.receivedByUser?.name);
+        line(doc, 'Notes', p.notes);
+        if (p.receipt_image) {
+          drawEmbeddedImage(doc, p.receipt_image, { fit: [140, 140], height: 140 });
+          linkLine(doc, 'Receipt image URL', fileUrl(p.receipt_image, baseUrl));
+        }
+        doc.moveDown(0.3);
+      });
+    }
+
+    sectionTitle(doc, `7. Family Meetings (${familyMeetings.length}/4)`);
+    if (!familyMeetings.length) {
+      doc.font('Helvetica').fontSize(10).fillColor('#64748B').text('No family meetings recorded.');
+    } else {
+      familyMeetings.forEach((m) => {
+        ensureSpace(doc, 90);
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(11)
+          .fillColor('#0F172A')
+          .text(`Meeting ${m.meeting_no} of 4 — ${m.meeting_date}`);
+        line(doc, 'Attendees', m.attendees);
+        line(doc, 'Notes', m.notes);
+        line(doc, 'Next meeting', m.next_meeting_date);
+        line(doc, 'Added by', m.addedByUser?.name);
+        doc.moveDown(0.3);
+      });
+    }
+
+    sectionTitle(doc, `8. Monthly Photos (${monthlyPhotos.length})`);
+    if (!monthlyPhotos.length) {
+      doc.font('Helvetica').fontSize(10).fillColor('#64748B').text('No monthly student photos on file.');
+    } else {
+      monthlyPhotos.forEach((p) => {
+        ensureSpace(doc, 180);
+        const period = `${MONTHS[(p.month || 1) - 1]} ${p.year}`;
+        doc.font('Helvetica-Bold').fontSize(11).fillColor('#0F172A').text(period);
+        line(doc, 'Taken on', p.taken_at);
+        line(doc, 'Notes', p.notes);
+        drawEmbeddedImage(doc, p.photo, { fit: [180, 180], height: 180 });
+        linkLine(doc, 'Photo URL', fileUrl(p.photo, baseUrl));
+        doc.moveDown(0.3);
+      });
+    }
+
     // Attachment index
-    sectionTitle(doc, '6. Attachment Index (open these links)');
+    sectionTitle(doc, '9. Attachment Index (open these links)');
     doc
       .font('Helvetica')
       .fontSize(9)
@@ -330,7 +410,14 @@ const exportStudentPdf = async (req, res, next) => {
     doctorVisits.forEach((v, i) => {
       pushIndex(`Visit ${i + 1} prescription PDF (${v.visit_date})`, v.prescription_pdf);
       pushIndex(`Visit ${i + 1} clinical image (${v.visit_date})`, v.prescription_image);
+      pushIndex(`Visit ${i + 1} checkup report (${v.visit_date})`, v.checkup_report);
     });
+    payments.forEach((p, i) =>
+      pushIndex(`Payment ${i + 1} receipt (${p.payment_date})`, p.receipt_image)
+    );
+    monthlyPhotos.forEach((p, i) =>
+      pushIndex(`Monthly photo ${i + 1}: ${MONTHS[(p.month || 1) - 1]} ${p.year}`, p.photo)
+    );
 
     doc.moveDown(1.2);
     doc

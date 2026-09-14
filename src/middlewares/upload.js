@@ -60,7 +60,9 @@ const uploadPrescriptionPdf = multer({
 const uploadPrescriptionFiles = multer({
   storage: makeStorage('prescriptions'),
   fileFilter: (req, file, cb) => {
-    if (file.fieldname === 'prescription_pdf') return pdfFilter(req, file, cb);
+    if (file.fieldname === 'prescription_pdf' || file.fieldname === 'checkup_report') {
+      return pdfFilter(req, file, cb);
+    }
     if (file.fieldname === 'prescription_image') return imageFilter(req, file, cb);
     return cb(new AppError('Unexpected file field', 400), false);
   },
@@ -68,7 +70,20 @@ const uploadPrescriptionFiles = multer({
 }).fields([
   { name: 'prescription_pdf', maxCount: 1 },
   { name: 'prescription_image', maxCount: 1 },
+  { name: 'checkup_report', maxCount: 1 },
 ]);
+
+const uploadMonthlyPhoto = multer({
+  storage: makeStorage('photos'),
+  fileFilter: imageFilter,
+  limits: { fileSize: 8 * 1024 * 1024 },
+}).single('photo');
+
+const uploadReceiptImage = multer({
+  storage: makeStorage('receipts'),
+  fileFilter: imageFilter,
+  limits: { fileSize: 8 * 1024 * 1024 },
+}).single('receipt_image');
 
 const uploadDischargeImage = multer({
   storage: makeStorage('profiles'),
@@ -110,4 +125,6 @@ module.exports = {
   uploadPrescriptionFiles,
   uploadDischargeImage,
   uploadStudentWithReports,
+  uploadMonthlyPhoto,
+  uploadReceiptImage,
 };

@@ -11,6 +11,25 @@ const loginValidators = [
   body('password').notEmpty().withMessage('Password is required'),
 ];
 
+const changePasswordValidators = [
+  body('current_password').notEmpty().withMessage('Current password is required'),
+  body('new_password')
+    .isLength({ min: 8 })
+    .withMessage('New password must be at least 8 characters')
+    .custom((value, { req }) => {
+      if (value === req.body.current_password) {
+        throw new Error('New password must be different from current password');
+      }
+      return true;
+    }),
+  body('confirm_password').custom((value, { req }) => {
+    if (value !== req.body.new_password) {
+      throw new Error('Password confirmation does not match');
+    }
+    return true;
+  }),
+];
+
 const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -53,4 +72,28 @@ const me = async (req, res, next) => {
   }
 };
 
-module.exports = { login, me, loginValidators };
+const changePassword = async (req, res, next) => {
+  try {
+    const { current_password, new_password } = req.body;
+    const user = await User.scope('withPassword').findByPk(req.user.id);
+    if (!user) throw new AppError('User not found', 401);
+
+    const match = await bcrypt.compare(current_password, user.password);
+    if (!match) throw new AppError('Current password is incorrect', 400);
+
+    const hashed = await bcrypt.hash(new_password, 12);
+    await user.update({ password: hashed });
+
+    return success(res, { changed: true, message: 'Password updated successfully' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = {
+  login,
+  me,
+  changePassword,
+  loginValidators,
+  changePasswordValidators,
+};

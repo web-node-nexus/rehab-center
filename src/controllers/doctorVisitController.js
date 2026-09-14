@@ -8,6 +8,7 @@ const mapVisit = (visit) => {
   const data = visit.toJSON ? visit.toJSON() : { ...visit };
   data.prescription_pdf = toPublicUrl(data.prescription_pdf);
   data.prescription_image = toPublicUrl(data.prescription_image);
+  data.checkup_report = toPublicUrl(data.checkup_report);
   return data;
 };
 
@@ -46,6 +47,9 @@ const createDoctorVisit = async (req, res, next) => {
     const imageFile =
       req.files?.prescription_image?.[0] ||
       (req.file?.fieldname === 'prescription_image' ? req.file : null);
+    const checkupFile =
+      req.files?.checkup_report?.[0] ||
+      (req.file?.fieldname === 'checkup_report' ? req.file : null);
 
     const visit = await DoctorVisit.create({
       student_id: student.id,
@@ -61,6 +65,7 @@ const createDoctorVisit = async (req, res, next) => {
       prescription_text: req.body.prescription_text || null,
       prescription_pdf: filePath('prescriptions', pdfFile),
       prescription_image: filePath('prescriptions', imageFile),
+      checkup_report: filePath('prescriptions', checkupFile),
       next_visit_date: req.body.next_visit_date || null,
     });
 
@@ -82,8 +87,10 @@ const updateDoctorVisit = async (req, res, next) => {
     const updates = { ...req.body };
     const pdfFile = req.files?.prescription_pdf?.[0];
     const imageFile = req.files?.prescription_image?.[0];
+    const checkupFile = req.files?.checkup_report?.[0];
     if (pdfFile) updates.prescription_pdf = filePath('prescriptions', pdfFile);
     if (imageFile) updates.prescription_image = filePath('prescriptions', imageFile);
+    if (checkupFile) updates.checkup_report = filePath('prescriptions', checkupFile);
     if (req.file && req.file.fieldname === 'prescription_pdf') {
       updates.prescription_pdf = filePath('prescriptions', req.file);
     }
