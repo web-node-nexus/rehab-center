@@ -14,9 +14,17 @@ SET @col := (
 SET @sql := IF(@col = 0, 'ALTER TABLE students ADD COLUMN duration_months INT UNSIGNED NULL', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+SET @inq := (
+  SELECT COUNT(*) FROM information_schema.TABLES
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'inquiries'
+);
 SET @col := (
   SELECT COUNT(*) FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'inquiries' AND COLUMN_NAME = 'looking_for'
 );
-SET @sql := IF(@col = 0, 'ALTER TABLE inquiries ADD COLUMN looking_for VARCHAR(120) NULL', 'SELECT 1');
+SET @sql := IF(
+  @inq = 0,
+  'SELECT 1',
+  IF(@col = 0, 'ALTER TABLE inquiries ADD COLUMN looking_for VARCHAR(120) NULL', 'SELECT 1')
+);
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

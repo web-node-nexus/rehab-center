@@ -33,6 +33,12 @@ const pdfFilter = (_req, file, cb) => {
   return cb(new AppError('Only PDF files are allowed', 400), false);
 };
 
+const documentFilter = (_req, file, cb) => {
+  const allowed = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+  if (allowed.includes(file.mimetype)) return cb(null, true);
+  return cb(new AppError('Only PDF, JPG, PNG, or WEBP files are allowed', 400), false);
+};
+
 const uploadProfileImage = multer({
   storage: makeStorage('profiles'),
   fileFilter: imageFilter,
@@ -41,7 +47,7 @@ const uploadProfileImage = multer({
 
 const uploadReportPdf = multer({
   storage: makeStorage('reports'),
-  fileFilter: pdfFilter,
+  fileFilter: documentFilter,
   limits: { fileSize: 15 * 1024 * 1024 },
 }).single('pdf_file');
 
@@ -60,8 +66,11 @@ const uploadPrescriptionPdf = multer({
 const uploadPrescriptionFiles = multer({
   storage: makeStorage('prescriptions'),
   fileFilter: (req, file, cb) => {
-    if (file.fieldname === 'prescription_pdf' || file.fieldname === 'checkup_report') {
+    if (file.fieldname === 'prescription_pdf') {
       return pdfFilter(req, file, cb);
+    }
+    if (file.fieldname === 'checkup_report') {
+      return documentFilter(req, file, cb);
     }
     if (file.fieldname === 'prescription_image') return imageFilter(req, file, cb);
     return cb(new AppError('Unexpected file field', 400), false);
@@ -119,7 +128,7 @@ const uploadStudentWithReports = multer({
     ) {
       return imageFilter(req, file, cb);
     }
-    if (file.fieldname === 'initial_reports') return pdfFilter(req, file, cb);
+    if (file.fieldname === 'initial_reports') return documentFilter(req, file, cb);
     return cb(new AppError('Unexpected file field', 400), false);
   },
   limits: { fileSize: 15 * 1024 * 1024 },

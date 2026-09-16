@@ -33,9 +33,39 @@ const success = (res, data, meta = null, status = 200) => {
   return res.status(status).json(payload);
 };
 
+const IST = 'Asia/Kolkata';
+
+const istISODate = (date = new Date()) =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: IST,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+
+const istPeriodBounds = (date = new Date()) => {
+  const today = istISODate(date);
+  const [yearStr, monthStr] = today.split('-');
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const start = `${year}-${String(month).padStart(2, '0')}-01`;
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const end = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  return { month, year, start, end, today };
+};
+
+const addDaysISO = (isoDate, days) => {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  const next = new Date(Date.UTC(y, m - 1, d + days));
+  return next.toISOString().slice(0, 10);
+};
+
 module.exports = {
   toPublicUrl,
   calcAge,
   parsePagination,
   success,
+  istISODate,
+  istPeriodBounds,
+  addDaysISO,
 };

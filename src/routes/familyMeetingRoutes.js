@@ -6,10 +6,12 @@ const {
   deleteFamilyMeeting,
 } = require('../controllers/familyMeetingController');
 const { authenticate } = require('../middlewares/auth');
+const { requirePermission } = require('../middlewares/authorize');
 
 const router = express.Router();
 
 router.use(authenticate);
+router.use(requirePermission('familyMeetings'));
 
 router.get('/students/:studentId/family-meetings', listFamilyMeetings);
 router.post('/students/:studentId/family-meetings', createFamilyMeeting);

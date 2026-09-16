@@ -153,6 +153,10 @@ const Student = sequelize.define(
       type: DataTypes.STRING(200),
       allowNull: true,
     },
+    admitted_by: {
+      type: DataTypes.STRING(120),
+      allowNull: true,
+    },
     status: {
       type: DataTypes.ENUM('active', 'discharged', 'inactive'),
       allowNull: false,

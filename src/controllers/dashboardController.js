@@ -1,15 +1,7 @@
 const { Op, fn, col } = require('sequelize');
 const { Student, MonthlyRecord, DoctorVisit, Payment, FamilyMeeting } = require('../models');
-const { success } = require('../utils/helpers');
-
-const periodBounds = (date = new Date()) => {
-  const month = date.getMonth() + 1;
-  const year = date.getFullYear();
-  const start = `${year}-${String(month).padStart(2, '0')}-01`;
-  const lastDay = new Date(year, month, 0).getDate();
-  const end = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-  return { month, year, start, end };
-};
+const { success, istPeriodBounds, addDaysISO } = require('../utils/helpers');
+const { can } = require('../utils/access');
 
 const toMoney = (value) => {
   const n = Number(value);
@@ -18,12 +10,8 @@ const toMoney = (value) => {
 
 const getStats = async (req, res, next) => {
   try {
-    const now = new Date();
-    const { month, year, start, end } = periodBounds(now);
-    const today = now.toISOString().slice(0, 10);
-    const inTwoWeeks = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .slice(0, 10);
+    const { month, year, start, end, today } = istPeriodBounds();
+    const inTwoWeeks = addDaysISO(today, 14);
 
     const [
       totalStudents,
@@ -84,7 +72,7 @@ const getStats = async (req, res, next) => {
       },
     });
 
-    return success(res, {
+    const payload = {
       totalStudents,
       activeStudents,
       testsThisMonth,
@@ -96,7 +84,22 @@ const getStats = async (req, res, next) => {
       unpaidThisMonth,
       month,
       year,
-    });
+    };
+    if (!can(req.user.role, 'payments')) {
+      payload.thisMonthIncome = null;
+      payload.totalIncome = null;
+      payload.paymentsThisMonth = 0;
+      payload.unpaidThisMonth = 0;
+    }
+    if (!can(req.user.role, 'doctorReport')) {
+      payload.upcomingVisits = 0;
+    }
+    if (!can(req.user.role, 'monthlyTests')) {
+      payload.testsThisMonth = 0;
+      payload.testsDue = 0;
+    }
+
+    return success(res, payload);
   } catch (err) {
     next(err);
   }
@@ -104,12 +107,9 @@ const getStats = async (req, res, next) => {
 
 const getReminders = async (req, res, next) => {
   try {
-    const now = new Date();
-    const { month, year } = periodBounds(now);
-    const today = now.toISOString().slice(0, 10);
-    const inTwoWeeks = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .slice(0, 10);
+    const { month, year, today } = istPeriodBounds();
+    const tomorrow = addDaysISO(today, 1);
+    const inTwoWeeks = addDaysISO(today, 14);
 
     const testedStudentIds = await MonthlyRecord.findAll({
       where: { month, year },
@@ -172,9 +172,36 @@ const getReminders = async (req, res, next) => {
       limit: 50,
     });
 
+    const todayMeetingRows = await FamilyMeeting.findAll({
+      where: { meeting_date: today },
+      include: [
+        {
+          model: Student,
+          as: 'student',
+          attributes: ['id', 'full_name', 'phone_number', 'status'],
+        },
+      ],
+      order: [['created_at', 'DESC']],
+      limit: 50,
+    });
+
+    const todayMeetings = todayMeetingRows
+      .filter((m) => m.student && m.student.status === 'active')
+      .map((m) => ({
+        meetingId: m.id,
+        studentId: m.student_id,
+        fullName: m.student.full_name,
+        phoneNumber: m.student.phone_number,
+        meetingDate: m.meeting_date,
+        meetingNo: m.meeting_no,
+        status: 'done',
+      }));
+
+    const todayStudentIds = todayMeetings.map((m) => m.studentId);
+
     const upcomingMeetingRows = await FamilyMeeting.findAll({
       where: {
-        next_meeting_date: { [Op.between]: [today, inTwoWeeks] },
+        next_meeting_date: { [Op.between]: [tomorrow, inTwoWeeks] },
       },
       include: [
         {
@@ -189,6 +216,7 @@ const getReminders = async (req, res, next) => {
 
     const upcomingMeetings = upcomingMeetingRows
       .filter((m) => m.student && m.student.status === 'active')
+      .filter((m) => !todayStudentIds.includes(m.student_id))
       .map((m) => ({
         meetingId: m.id,
         studentId: m.student_id,
@@ -198,21 +226,55 @@ const getReminders = async (req, res, next) => {
         meetingNo: m.meeting_no,
       }));
 
+    const dueTodayRows = await FamilyMeeting.findAll({
+      where: {
+        next_meeting_date: today,
+        ...(todayStudentIds.length ? { student_id: { [Op.notIn]: todayStudentIds } } : {}),
+      },
+      include: [
+        {
+          model: Student,
+          as: 'student',
+          attributes: ['id', 'full_name', 'phone_number', 'status'],
+        },
+      ],
+      order: [['meeting_no', 'ASC']],
+      limit: 50,
+    });
+
+    const dueTodayMeetings = dueTodayRows
+      .filter((m) => m.student && m.student.status === 'active')
+      .map((m) => ({
+        meetingId: m.id,
+        studentId: m.student_id,
+        fullName: m.student.full_name,
+        phoneNumber: m.student.phone_number,
+        meetingDate: m.next_meeting_date,
+        meetingNo: m.meeting_no,
+        status: 'due',
+      }));
+
+    const role = req.user.role;
     return success(res, {
       month,
       year,
-      pendingTests: pendingTests.map((s) => ({
-        studentId: s.id,
-        fullName: s.full_name,
-        phoneNumber: s.phone_number,
-      })),
-      upcomingVisits,
-      unpaidStudents: unpaidStudents.map((s) => ({
-        studentId: s.id,
-        fullName: s.full_name,
-        phoneNumber: s.phone_number,
-      })),
+      pendingTests: can(role, 'monthlyTests')
+        ? pendingTests.map((s) => ({
+            studentId: s.id,
+            fullName: s.full_name,
+            phoneNumber: s.phone_number,
+          }))
+        : [],
+      upcomingVisits: can(role, 'doctorReport') ? upcomingVisits : [],
+      unpaidStudents: can(role, 'payments')
+        ? unpaidStudents.map((s) => ({
+            studentId: s.id,
+            fullName: s.full_name,
+            phoneNumber: s.phone_number,
+          }))
+        : [],
       upcomingMeetings,
+      todayMeetings: [...todayMeetings, ...dueTodayMeetings],
     });
   } catch (err) {
     next(err);

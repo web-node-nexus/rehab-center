@@ -5,7 +5,46 @@ const { toPublicUrl, parsePagination, success } = require('../utils/helpers');
 const mapPhoto = (row) => {
   const data = row.toJSON ? row.toJSON() : { ...row };
   data.photo = toPublicUrl(data.photo);
+  if (data.student) {
+    data.student = {
+      ...data.student,
+      profile_image: toPublicUrl(data.student.profile_image),
+    };
+  }
   return data;
+};
+
+const listAllMonthlyPhotos = async (req, res, next) => {
+  try {
+    const where = {};
+    if (req.query.month) where.month = parseInt(req.query.month, 10);
+    if (req.query.year) where.year = parseInt(req.query.year, 10);
+
+    const { page, limit, offset } = parsePagination({ ...req.query, limit: req.query.limit || 50 });
+    const { rows, count } = await MonthlyPhoto.findAndCountAll({
+      where,
+      include: [
+        { model: Student, as: 'student', attributes: ['id', 'full_name', 'profile_image'] },
+        { model: User, as: 'addedByUser', attributes: ['id', 'name', 'role'] },
+      ],
+      order: [
+        ['year', 'DESC'],
+        ['month', 'DESC'],
+        ['created_at', 'DESC'],
+      ],
+      limit,
+      offset,
+    });
+
+    return success(res, rows.map(mapPhoto), {
+      page,
+      limit,
+      total: count,
+      totalPages: Math.ceil(count / limit),
+    });
+  } catch (err) {
+    next(err);
+  }
 };
 
 const listMonthlyPhotos = async (req, res, next) => {
@@ -119,6 +158,7 @@ const deleteMonthlyPhoto = async (req, res, next) => {
 };
 
 module.exports = {
+  listAllMonthlyPhotos,
   listMonthlyPhotos,
   createMonthlyPhoto,
   updateMonthlyPhoto,

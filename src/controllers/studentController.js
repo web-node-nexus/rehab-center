@@ -1,5 +1,6 @@
-const { Op } = require('sequelize');
+const { Op, literal } = require('sequelize');
 const {
+  User,
   Student,
   InitialReport,
   MonthlyRecord,
@@ -8,21 +9,28 @@ const {
   FamilyMeeting,
   MonthlyPhoto,
   Pickup,
+  PsychologistReport,
 } = require('../models');
 const AppError = require('../utils/AppError');
 const { toPublicUrl, calcAge, parsePagination, success } = require('../utils/helpers');
-const { parseMoneyField, parseOptionalText, parseIntField, computeMonthlyFee, buildFeeLedger, toMoneyOrNull } = require('../utils/feeLedger');
+const { parseMoneyField, parseOptionalText, parseIntField, computeMonthlyFee, computeGrandTotal, buildFeeLedger, toMoneyOrNull } = require('../utils/feeLedger');
+const { mapReport } = require('./psychologistReportController');
+const { shapeStudentForRole } = require('../utils/access');
 
 const applyFeeFields = (body, target) => {
-  if (body.agreed_fee !== undefined) target.agreed_fee = parseMoneyField(body.agreed_fee);
   if (body.admission_fee !== undefined) target.admission_fee = parseMoneyField(body.admission_fee);
   if (body.duration_months !== undefined) target.duration_months = parseIntField(body.duration_months);
   if (body.monthly_fee !== undefined) target.monthly_fee = parseMoneyField(body.monthly_fee);
+  if (body.agreed_fee !== undefined) target.agreed_fee = parseMoneyField(body.agreed_fee);
 
-  const total = target.agreed_fee !== undefined ? target.agreed_fee : undefined;
+  const monthly = target.monthly_fee !== undefined ? target.monthly_fee : undefined;
   const admission = target.admission_fee !== undefined ? target.admission_fee : undefined;
   const months = target.duration_months !== undefined ? target.duration_months : undefined;
-  if (total != null && months) {
+  const total = target.agreed_fee !== undefined ? target.agreed_fee : undefined;
+
+  if (monthly != null && months) {
+    target.agreed_fee = computeGrandTotal(monthly, admission || 0, months);
+  } else if (monthly == null && total != null && months) {
     target.monthly_fee = computeMonthlyFee(total, admission || 0, months);
   }
 };
@@ -49,7 +57,7 @@ const mapStudent = (student) => {
 
 const listStudents = async (req, res, next) => {
   try {
-    const { search, status } = req.query;
+    const { search, status, join_month } = req.query;
     const { page, limit, offset } = parsePagination(req.query);
 
     const where = {};
@@ -64,15 +72,28 @@ const listStudents = async (req, res, next) => {
         { admission_reason: { [Op.like]: q } },
       ];
     }
+    if (join_month && /^\d{4}-\d{2}$/.test(String(join_month))) {
+      const [yearStr, monthStr] = String(join_month).split('-');
+      const year = Number(yearStr);
+      const month = Number(monthStr);
+      const lastDay = new Date(year, month, 0).getDate();
+      where.date_of_joining = {
+        [Op.between]: [`${join_month}-01`, `${join_month}-${String(lastDay).padStart(2, '0')}`],
+      };
+    }
 
     const { rows, count } = await Student.findAndCountAll({
       where,
-      order: [['created_at', 'DESC']],
+      order: [
+        [literal('date_of_joining IS NULL'), 'ASC'],
+        ['date_of_joining', 'DESC'],
+        ['created_at', 'DESC'],
+      ],
       limit,
       offset,
     });
 
-    return success(res, rows.map(mapStudent), {
+    return success(res, rows.map((row) => shapeStudentForRole(mapStudent(row), req.user.role)), {
       page,
       limit,
       total: count,
@@ -135,6 +156,11 @@ const getStudent = async (req, res, next) => {
           separate: true,
           order: [['form_date', 'DESC'], ['created_at', 'DESC']],
           limit: 10,
+        },
+        {
+          model: PsychologistReport,
+          as: 'psychologist_report',
+          include: [{ model: User, as: 'addedByUser', attributes: ['id', 'name', 'role'] }],
         },
       ],
     });
@@ -204,8 +230,11 @@ const getStudent = async (req, res, next) => {
         is_paid: Boolean(p.is_paid),
       }));
     }
+    if (data.psychologist_report) {
+      data.psychologist_report = mapReport(data.psychologist_report);
+    }
 
-    return success(res, data);
+    return success(res, shapeStudentForRole(data, req.user.role));
   } catch (err) {
     next(err);
   }
@@ -216,6 +245,10 @@ const createStudent = async (req, res, next) => {
     const body = req.body;
     if (!body.full_name || !String(body.full_name).trim()) {
       throw new AppError('Full name is required', 400);
+    }
+    const admittedBy = String(body.admitted_by || '').trim();
+    if (admittedBy.length < 2) {
+      throw new AppError('Admitted by is required', 400);
     }
 
     const age = body.age ? parseInt(body.age, 10) : calcAge(body.date_of_birth);
@@ -257,7 +290,14 @@ const createStudent = async (req, res, next) => {
       visiting_phone: body.visiting_phone || null,
       father_name: parseOptionalText(body.father_name),
       mother_name: parseOptionalText(body.mother_name),
-      agreed_fee: parseMoneyField(body.agreed_fee) ?? null,
+      agreed_fee:
+        computeGrandTotal(
+          parseMoneyField(body.monthly_fee),
+          parseMoneyField(body.admission_fee) ?? 0,
+          parseIntField(body.duration_months)
+        ) ??
+        parseMoneyField(body.agreed_fee) ??
+        null,
       admission_fee: parseMoneyField(body.admission_fee) ?? null,
       duration_months: parseIntField(body.duration_months) ?? null,
       monthly_fee:
@@ -268,6 +308,7 @@ const createStudent = async (req, res, next) => {
           parseIntField(body.duration_months)
         ),
       referred_by: body.referred_by || null,
+      admitted_by: admittedBy,
       status: body.status || 'active',
       discharge_date: body.discharge_date || null,
       notes: body.notes || null,
@@ -324,6 +365,7 @@ const updateStudent = async (req, res, next) => {
 
     if (body.father_name !== undefined) updates.father_name = parseOptionalText(body.father_name);
     if (body.mother_name !== undefined) updates.mother_name = parseOptionalText(body.mother_name);
+    if (body.admitted_by !== undefined) updates.admitted_by = parseOptionalText(body.admitted_by);
     applyFeeFields(body, updates);
 
     if (req.file) {
@@ -353,6 +395,17 @@ const deleteStudent = async (req, res, next) => {
 
     const hard = req.query.hard === 'true' || req.query.hard === '1';
     if (hard) {
+      const where = { student_id: student.id };
+      await Promise.all([
+        InitialReport.destroy({ where }),
+        MonthlyRecord.destroy({ where }),
+        DoctorVisit.destroy({ where }),
+        Payment.destroy({ where }),
+        FamilyMeeting.destroy({ where }),
+        MonthlyPhoto.destroy({ where }),
+        Pickup.destroy({ where }),
+        PsychologistReport.destroy({ where }),
+      ]);
       await student.destroy();
       return success(res, { id: Number(req.params.id), deleted: true });
     }

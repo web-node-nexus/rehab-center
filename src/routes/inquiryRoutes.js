@@ -6,10 +6,12 @@ const {
   deleteInquiry,
 } = require('../controllers/inquiryController');
 const { authenticate } = require('../middlewares/auth');
+const { requirePermission } = require('../middlewares/authorize');
 
 const router = express.Router();
 
 router.use(authenticate);
+router.use(requirePermission('inquiries'));
 
 router.get('/inquiries', listInquiries);
 router.post('/inquiries', createInquiry);

@@ -8,6 +8,8 @@ const FamilyMeeting = require('./FamilyMeeting');
 const MonthlyPhoto = require('./MonthlyPhoto');
 const Inquiry = require('./Inquiry');
 const Pickup = require('./Pickup');
+const PsychologistReport = require('./PsychologistReport');
+const CashEntry = require('./CashEntry');
 
 Student.hasMany(InitialReport, {
   foreignKey: 'student_id',
@@ -73,6 +75,18 @@ Pickup.belongsTo(Student, { foreignKey: 'student_id', as: 'student' });
 Pickup.belongsTo(User, { foreignKey: 'added_by', as: 'addedByUser' });
 User.hasMany(Pickup, { foreignKey: 'added_by', as: 'pickups' });
 
+Student.hasOne(PsychologistReport, {
+  foreignKey: 'student_id',
+  as: 'psychologist_report',
+  onDelete: 'CASCADE',
+});
+PsychologistReport.belongsTo(Student, { foreignKey: 'student_id', as: 'student' });
+PsychologistReport.belongsTo(User, { foreignKey: 'added_by', as: 'addedByUser' });
+User.hasMany(PsychologistReport, { foreignKey: 'added_by', as: 'psychologist_reports' });
+
+CashEntry.belongsTo(User, { foreignKey: 'added_by', as: 'addedByUser' });
+User.hasMany(CashEntry, { foreignKey: 'added_by', as: 'cash_entries' });
+
 module.exports = {
   User,
   Student,
@@ -84,4 +98,6 @@ module.exports = {
   MonthlyPhoto,
   Inquiry,
   Pickup,
+  PsychologistReport,
+  CashEntry,
 };

@@ -5,11 +5,13 @@ const {
   deleteInitialReport,
 } = require('../controllers/initialReportController');
 const { authenticate } = require('../middlewares/auth');
+const { requirePermission } = require('../middlewares/authorize');
 const { uploadReportPdf } = require('../middlewares/upload');
 
 const router = express.Router();
 
 router.use(authenticate);
+router.use(requirePermission('btReport'));
 
 router.get('/students/:studentId/initial-reports', listInitialReports);
 router.post('/students/:studentId/initial-reports', uploadReportPdf, createInitialReport);

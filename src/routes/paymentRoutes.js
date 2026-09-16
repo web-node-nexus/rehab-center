@@ -7,11 +7,13 @@ const {
   deletePayment,
 } = require('../controllers/paymentController');
 const { authenticate } = require('../middlewares/auth');
+const { requirePermission } = require('../middlewares/authorize');
 const { uploadReceiptImage } = require('../middlewares/upload');
 
 const router = express.Router();
 
 router.use(authenticate);
+router.use(requirePermission('payments'));
 
 router.get('/payments', listAllPayments);
 router.get('/students/:studentId/payments', listStudentPayments);

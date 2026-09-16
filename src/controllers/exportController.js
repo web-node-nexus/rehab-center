@@ -1,7 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const PDFDocument = require('pdfkit');
-const { Student, InitialReport, MonthlyRecord, DoctorVisit, User, Payment, FamilyMeeting, MonthlyPhoto } = require('../models');
+const { Student, InitialReport, MonthlyRecord, DoctorVisit, User, Payment, FamilyMeeting, MonthlyPhoto, PsychologistReport } = require('../models');
 const AppError = require('../utils/AppError');
 const env = require('../config/env');
 const { toPublicUrl } = require('../utils/helpers');
@@ -123,7 +123,7 @@ const exportStudentPdf = async (req, res, next) => {
 
     const baseUrl = baseUrlFromReq(req);
 
-    const [initialReports, monthlyRecords, doctorVisits, payments, familyMeetings, monthlyPhotos] =
+    const [initialReports, monthlyRecords, doctorVisits, payments, familyMeetings, monthlyPhotos, psychologistReport] =
       await Promise.all([
       InitialReport.findAll({
         where: { student_id: student.id },
@@ -153,6 +153,10 @@ const exportStudentPdf = async (req, res, next) => {
         where: { student_id: student.id },
         include: [{ model: User, as: 'addedByUser', attributes: ['id', 'name'] }],
         order: [['year', 'DESC'], ['month', 'DESC']],
+      }),
+      PsychologistReport.findOne({
+        where: { student_id: student.id },
+        include: [{ model: User, as: 'addedByUser', attributes: ['id', 'name'] }],
       }),
     ]);
 
@@ -216,7 +220,7 @@ const exportStudentPdf = async (req, res, next) => {
     line(doc, 'Known Allergies', student.known_allergies);
     line(doc, 'Past Medical History', student.past_medical_history);
     line(doc, 'Current Medications', student.current_medications);
-    line(doc, 'Referred By', student.referred_by);
+    line(doc, 'Admitted By', student.admitted_by);
     line(doc, 'Notes', student.notes);
 
     if (student.aadhar_image) {
@@ -244,12 +248,47 @@ const exportStudentPdf = async (req, res, next) => {
       drawEmbeddedImage(doc, student.family_aadhar_image, { fit: [240, 150], height: 150 });
       linkLine(doc, 'Family Aadhaar URL', fileUrl(student.family_aadhar_image, baseUrl));
     }
-    line(doc, 'Visitor Name', student.visiting_name);
-    line(doc, 'Visitor Address', student.visiting_address);
-    line(doc, 'Visitor Mobile', student.visiting_phone);
     line(doc, 'Emergency Contact', student.emergency_contact_name);
     line(doc, 'Emergency Relation', student.emergency_contact_relation);
     line(doc, 'Emergency Phone', student.emergency_contact_phone);
+
+    sectionTitle(doc, 'Clinical Psychologist Report');
+    if (!psychologistReport) {
+      doc.font('Helvetica').fontSize(10).fillColor('#64748B').text('No psychologist report on file.');
+    } else {
+      const psych = psychologistReport.toJSON ? psychologistReport.toJSON() : psychologistReport;
+      let causes = [];
+      try {
+        causes = psych.cause_of_addiction ? JSON.parse(psych.cause_of_addiction) : [];
+      } catch {
+        causes = [];
+      }
+      const causeLabels = {
+        pre_morbid_personality: 'Pre-morbid Personality',
+        depression: 'Depression',
+        anxiety: 'Anxiety',
+        frustration: 'Frustration',
+        loneliness: 'Loneliness',
+        curiosity: 'Curiosity',
+        peer_pressure: 'Peer Pressure',
+        individual_problem: 'Individual Problem',
+        family_problem: 'Family Problem',
+        other: 'Other',
+      };
+      line(doc, 'First time consuming', psych.first_time_consuming);
+      line(doc, 'Reasons for inability to quit', psych.reasons_inability_to_quit);
+      line(doc, 'Reasons for relapsing', psych.reasons_relapsing);
+      line(doc, 'Type of problem', psych.type_of_problem);
+      line(doc, 'Mental state', psych.mental_state);
+      line(
+        doc,
+        'Cause of addiction',
+        Array.isArray(causes) && causes.length
+          ? causes.map((key) => causeLabels[key] || key).join(', ')
+          : null
+      );
+      line(doc, 'Note', psych.notes);
+    }
 
     // Initial reports
     sectionTitle(doc, `3. Initial Reports (${initialReports.length})`);
@@ -318,21 +357,9 @@ const exportStudentPdf = async (req, res, next) => {
         line(doc, 'BP', v.bp);
         line(doc, 'Pulse', v.pulse);
         line(doc, 'Temperature', v.temperature);
-        line(doc, 'Weight', v.weight != null ? `${v.weight} kg` : null);
-        line(doc, 'SpO2', v.spo2);
-        line(doc, 'Symptoms', v.symptoms_observed);
-        line(doc, 'Diagnosis', v.diagnosis);
-        line(doc, 'Prescription', v.prescription_text);
-        line(doc, 'Next Visit', v.next_visit_date);
-        if (v.prescription_pdf) {
-          linkLine(doc, 'Prescription PDF URL', fileUrl(v.prescription_pdf, baseUrl));
-        }
         if (v.prescription_image) {
           drawEmbeddedImage(doc, v.prescription_image, { fit: [160, 160], height: 160 });
-          linkLine(doc, 'Prescription image URL', fileUrl(v.prescription_image, baseUrl));
-        }
-        if (v.checkup_report) {
-          linkLine(doc, 'Checkup report PDF URL', fileUrl(v.checkup_report, baseUrl));
+          linkLine(doc, 'Clinical photo URL', fileUrl(v.prescription_image, baseUrl));
         }
         doc.moveDown(0.35);
       });

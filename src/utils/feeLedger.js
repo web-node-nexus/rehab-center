@@ -33,11 +33,18 @@ const parseIntField = (value) => {
   return Number.isFinite(n) && n > 0 ? n : null;
 };
 
+/** Legacy: monthly was stored as (total − admission) / months. */
 const computeMonthlyFee = (total, admission, months) => {
   if (total == null || months == null || months <= 0) return null;
   const rest = Number((total - (admission || 0)).toFixed(2));
   if (rest < 0) return null;
   return Number((rest / months).toFixed(2));
+};
+
+/** Grand total = (monthly × months) + admission. Admission is an add-on, never subtracted. */
+const computeGrandTotal = (monthly, admission, months) => {
+  if (monthly == null || months == null || months <= 0) return null;
+  return Number((monthly * months + (admission || 0)).toFixed(2));
 };
 
 const buildFeeLedger = async (student) => {
@@ -74,14 +81,21 @@ const buildFeeLedger = async (student) => {
       Pickup.count({ where: { student_id: student.id } }),
     ]);
 
-  const agreedFee = toMoneyOrNull(student.agreed_fee);
+  const storedAgreed = toMoneyOrNull(student.agreed_fee);
   const admissionFee = toMoneyOrNull(student.admission_fee);
   const durationMonths =
     student.duration_months == null ? null : Number(student.duration_months) || null;
-  const packageAmount =
-    agreedFee == null ? null : Number(Math.max(0, agreedFee - (admissionFee || 0)).toFixed(2));
   const monthlyFee =
-    toMoneyOrNull(student.monthly_fee) ?? computeMonthlyFee(agreedFee, admissionFee, durationMonths);
+    toMoneyOrNull(student.monthly_fee) ??
+    computeMonthlyFee(storedAgreed, admissionFee, durationMonths);
+  const packageAmount =
+    monthlyFee != null && durationMonths
+      ? Number((monthlyFee * durationMonths).toFixed(2))
+      : storedAgreed == null
+        ? null
+        : Number(Math.max(0, storedAgreed - (admissionFee || 0)).toFixed(2));
+  const agreedFee =
+    computeGrandTotal(monthlyFee, admissionFee || 0, durationMonths) ?? storedAgreed;
   const paid = toMoney(paymentTotal?.total);
   const thisMonthPaid = toMoney(thisMonthTotal?.total);
   const pickupCharges = toMoney(pickupCharged?.total);
@@ -112,5 +126,6 @@ module.exports = {
   parseOptionalText,
   parseIntField,
   computeMonthlyFee,
+  computeGrandTotal,
   buildFeeLedger,
 };
