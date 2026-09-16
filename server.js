@@ -56,7 +56,11 @@ app.use(errorHandler);
 const start = async () => {
   try {
     await sequelize.authenticate();
-    await sequelize.sync({ alter: env.nodeEnv === 'development' });
+    // Live/production: never alter or recreate tables on boot (protects existing data).
+    // Local/dev only: create missing tables; still no force/drop.
+    if (env.nodeEnv === 'development') {
+      await sequelize.sync({ alter: false });
+    }
     app.listen(env.port, () => {
       console.log(`Rehab Center API listening on ${env.host}`);
     });
