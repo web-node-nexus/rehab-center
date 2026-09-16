@@ -21,6 +21,7 @@ const inquiryRoutes = require('./src/routes/inquiryRoutes');
 const pickupRoutes = require('./src/routes/pickupRoutes');
 const psychologistReportRoutes = require('./src/routes/psychologistReportRoutes');
 const cashbookRoutes = require('./src/routes/cashbookRoutes');
+const adminRoutes = require('./src/routes/adminRoutes');
 
 const app = express();
 
@@ -44,6 +45,7 @@ app.use('/api', inquiryRoutes);
 app.use('/api', pickupRoutes);
 app.use('/api', psychologistReportRoutes);
 app.use('/api', cashbookRoutes);
+app.use('/api', adminRoutes);
 app.use('/api', initialReportRoutes);
 app.use('/api', monthlyRecordRoutes);
 app.use('/api', doctorVisitRoutes);

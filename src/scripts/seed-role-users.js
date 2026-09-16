@@ -32,19 +32,19 @@ const seed = async () => {
     );
 
     for (const account of ACCOUNTS) {
+      const hashed = await bcrypt.hash(account.password, 10);
       const existing = await User.scope('withPassword').findOne({
         where: { email: account.email },
       });
       if (existing) {
-        if (existing.role !== account.role) {
-          await existing.update({ role: account.role, name: account.name });
-          console.log(`Updated role for ${account.email} → ${account.role}`);
-        } else {
-          console.log(`Already exists: ${account.email} (${account.role})`);
-        }
+        await existing.update({
+          role: account.role,
+          name: account.name,
+          password: hashed,
+        });
+        console.log(`Reset ${account.role}: ${account.email} / ${account.password}`);
         continue;
       }
-      const hashed = await bcrypt.hash(account.password, 10);
       await User.create({
         name: account.name,
         email: account.email,
@@ -54,6 +54,8 @@ const seed = async () => {
       console.log(`Created ${account.role}: ${account.email} / ${account.password}`);
     }
 
+    const all = await User.findAll({ attributes: ['id', 'name', 'email', 'role'], order: [['id', 'ASC']] });
+    console.log('Users now:', all.map((u) => u.toJSON()));
     process.exit(0);
   } catch (err) {
     console.error('Role seed failed:', err.message);

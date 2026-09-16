@@ -5,6 +5,7 @@ const { User } = require('../models');
 const env = require('../config/env');
 const AppError = require('../utils/AppError');
 const { success } = require('../utils/helpers');
+const { upsertSession } = require('./adminController');
 
 const loginValidators = [
   body('email').isEmail().withMessage('Valid email is required'),
@@ -33,14 +34,34 @@ const changePasswordValidators = [
 const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    const user = await User.scope('withPassword').findOne({ where: { email } });
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const user = await User.scope('withPassword').findOne({
+      where: { email: normalizedEmail },
+    });
     if (!user) throw new AppError('Invalid email or password', 401);
 
-    const match = await bcrypt.compare(password, user.password);
+    const match = await bcrypt.compare(String(password || ''), user.password);
     if (!match) throw new AppError('Invalid email or password', 401);
 
+    let session = null;
+    try {
+      session = await upsertSession(user.id, req.body);
+    } catch (sessionErr) {
+      // Table may not exist yet on first deploy; login must still work.
+      console.warn('Device session skipped:', sessionErr.message);
+    }
+
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+      {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        ...(session
+          ? { device_id: session.device_id, sid: session.id }
+          : req.body.device_id
+            ? { device_id: String(req.body.device_id) }
+            : {}),
+      },
       env.jwt.secret,
       { expiresIn: env.jwt.expiresIn }
     );
@@ -53,6 +74,7 @@ const login = async (req, res, next) => {
         email: user.email,
         role: user.role,
       },
+      device_id: session?.device_id || req.body.device_id || null,
     });
   } catch (err) {
     next(err);

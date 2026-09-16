@@ -1,7 +1,8 @@
 const jwt = require('jsonwebtoken');
 const env = require('../config/env');
-const { User } = require('../models');
+const { User, DeviceSession } = require('../models');
 const AppError = require('../utils/AppError');
+const { touchSession } = require('../controllers/adminController');
 
 const authenticate = async (req, res, next) => {
   try {
@@ -23,7 +24,25 @@ const authenticate = async (req, res, next) => {
       throw new AppError('User not found', 401);
     }
 
+    if (decoded.sid) {
+      try {
+        const session = await DeviceSession.findByPk(decoded.sid);
+        if (!session || !session.is_active || session.user_id !== user.id) {
+          throw new AppError('Session expired. Please sign in again.', 401);
+        }
+      } catch (err) {
+        if (err instanceof AppError) throw err;
+        // Ignore missing table during rollout
+      }
+    }
+
+    const deviceId = decoded.device_id || req.headers['x-device-id'];
+    if (deviceId) {
+      touchSession(user.id, deviceId).catch(() => {});
+    }
+
     req.user = user;
+    req.deviceId = deviceId || null;
     next();
   } catch (err) {
     next(err);
