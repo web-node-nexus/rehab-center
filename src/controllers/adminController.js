@@ -62,14 +62,95 @@ const logoutSession = async (req, res, next) => {
   }
 };
 
+const ROLE_ACCOUNT_DEFAULTS = [
+  {
+    name: 'Doctor',
+    email: process.env.DOCTOR_EMAIL || 'doctor@rehabcenter.com',
+    password: process.env.DOCTOR_PASSWORD || 'Doctor@123',
+    role: 'doctor',
+  },
+  {
+    name: 'Staff',
+    email: process.env.STAFF_EMAIL || 'staff@rehabcenter.com',
+    password: process.env.STAFF_PASSWORD || 'Staff@123',
+    role: 'staff',
+  },
+  {
+    name: 'Psychologist',
+    email: process.env.PSYCHOLOGIST_EMAIL || 'psychologist@rehabcenter.com',
+    password: process.env.PSYCHOLOGIST_PASSWORD || 'Psych@123',
+    role: 'psychologist',
+  },
+];
+
+const ensureRoleAccounts = async ({ resetPasswords = false } = {}) => {
+  const bcrypt = require('bcryptjs');
+  const results = [];
+  for (const account of ROLE_ACCOUNT_DEFAULTS) {
+    const email = String(account.email).trim().toLowerCase();
+    const existing = await User.scope('withPassword').findOne({ where: { email } });
+    if (existing) {
+      const updates = { role: account.role, name: account.name };
+      if (resetPasswords) {
+        updates.password = await bcrypt.hash(account.password, 12);
+      }
+      await existing.update(updates);
+      results.push({
+        id: existing.id,
+        email,
+        role: account.role,
+        action: resetPasswords ? 'password_reset' : 'exists',
+        default_password: resetPasswords ? account.password : undefined,
+      });
+      continue;
+    }
+    const hashed = await bcrypt.hash(account.password, 12);
+    const created = await User.create({
+      name: account.name,
+      email,
+      password: hashed,
+      role: account.role,
+    });
+    results.push({
+      id: created.id,
+      email,
+      role: account.role,
+      action: 'created',
+      default_password: account.password,
+    });
+  }
+  return results;
+};
+
 const listUsers = async (req, res, next) => {
   try {
     if (req.user.role !== 'admin') throw new AppError('You are not authorized for this action', 403);
+    // Auto-create missing role accounts so login never fails for doctor/staff/psych
+    await ensureRoleAccounts({ resetPasswords: false });
     const users = await User.findAll({
       attributes: ['id', 'name', 'email', 'role', 'created_at', 'updated_at'],
       order: [['id', 'ASC']],
     });
     return success(res, users);
+  } catch (err) {
+    next(err);
+  }
+};
+
+const ensureRoleUsers = async (req, res, next) => {
+  try {
+    if (req.user.role !== 'admin') throw new AppError('You are not authorized for this action', 403);
+    const reset = String(req.body?.reset_passwords || req.query?.reset_passwords || '') === 'true';
+    const results = await ensureRoleAccounts({ resetPasswords: reset });
+    return success(res, {
+      ensured: true,
+      results,
+      defaults: ROLE_ACCOUNT_DEFAULTS.map((a) => ({
+        email: a.email,
+        role: a.role,
+        password: a.password,
+      })),
+    });
   } catch (err) {
     next(err);
   }
@@ -144,6 +225,7 @@ module.exports = {
   touchSession,
   logoutSession,
   listUsers,
+  ensureRoleUsers,
   adminSetPassword,
   listSessions,
   revokeSession,

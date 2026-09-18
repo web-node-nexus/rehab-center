@@ -35,9 +35,16 @@ const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
     const normalizedEmail = String(email || '').trim().toLowerCase();
-    const user = await User.scope('withPassword').findOne({
+    let user = await User.scope('withPassword').findOne({
       where: { email: normalizedEmail },
     });
+    // Fallback for older rows with mixed-case emails
+    if (!user) {
+      const { fn, col, where } = require('sequelize');
+      user = await User.scope('withPassword').findOne({
+        where: where(fn('LOWER', col('email')), normalizedEmail),
+      });
+    }
     if (!user) throw new AppError('Invalid email or password', 401);
 
     const match = await bcrypt.compare(String(password || ''), user.password);

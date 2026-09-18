@@ -3,6 +3,7 @@ const { body } = require('express-validator');
 const {
   logoutSession,
   listUsers,
+  ensureRoleUsers,
   adminSetPassword,
   listSessions,
   revokeSession,
@@ -17,6 +18,7 @@ router.use(authenticate);
 router.post('/auth/logout', logoutSession);
 
 router.get('/admin/users', listUsers);
+router.post('/admin/ensure-role-users', ensureRoleUsers);
 router.put(
   '/admin/users/:id/password',
   [

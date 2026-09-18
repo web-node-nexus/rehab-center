@@ -15,7 +15,7 @@ const ROLE_PERMISSIONS = {
     'student.basic',
     'psychologistReport',
   ],
-  staff: ['inquiries', 'students', 'student.basic', 'cashbook'],
+  staff: ['inquiries', 'students', 'student.basic'],
 };
 
 const TAB_PERMISSIONS = {
