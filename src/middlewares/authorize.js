@@ -41,7 +41,13 @@ const resolveRole = (reqOrUser) => {
 
 /** Hard allow-lists — cannot be broken by stale ROLE_PERMISSIONS */
 const ROLE_ALLOW = {
-  staff: new Set(['inquiries', 'students', 'student.basic', 'settings']),
+  staff: new Set([
+    'inquiries',
+    'students',
+    'student.basic',
+    'students.admit',
+    'settings',
+  ]),
   doctor: new Set([
     'home',
     'students',
@@ -72,6 +78,7 @@ const hasPermission = (role, permission) => {
   ) {
     return true;
   }
+  if (p === 'students.admit' && r === 'staff') return true;
   if (p === 'inquiries' && r === 'staff') return true;
   if (p === 'doctorReport' && r === 'doctor') return true;
   if (p === 'psychologistReport' && r === 'psychologist') return true;

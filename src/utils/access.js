@@ -19,8 +19,8 @@ const ROLE_PERMISSIONS = {
     'student.basic',
     'psychologistReport',
   ],
-  // Staff: enquiry CRUD + student basic view (list + detail). NEVER payments/manage.
-  staff: ['inquiries', 'students', 'student.basic'],
+  // Staff: enquiry + student list/view + admit (create/update). No payments module.
+  staff: ['inquiries', 'students', 'student.basic', 'students.admit'],
 };
 
 const TAB_PERMISSIONS = {
@@ -45,7 +45,12 @@ const can = (role, permission) => {
 
   // Explicit hard checks so staff/doctor/psych never break if arrays drift
   if (r === 'staff') {
-    return p === 'inquiries' || p === 'students' || p === 'student.basic';
+    return (
+      p === 'inquiries' ||
+      p === 'students' ||
+      p === 'student.basic' ||
+      p === 'students.admit'
+    );
   }
   if (r === 'doctor') {
     return (
@@ -110,7 +115,32 @@ const pickFields = (data, keys) => {
 const shapeStudentForRole = (data, role) => {
   const r = normalizeRole(role);
   if (!data || r === 'admin') return data;
-  if (r === 'staff') return pickFields(data, BASIC_STUDENT_FIELDS);
+  if (r === 'staff') {
+    // Staff can admit — return form fields, hide payment history / clinical modules
+    const next = { ...data };
+    delete next.payments;
+    delete next.payment_totals;
+    delete next.fee_ledger;
+    delete next.pickups;
+    delete next.family_meetings;
+    delete next.monthly_photos;
+    delete next.psychologist_report;
+    delete next.initial_reports;
+    delete next.monthly_records;
+    delete next.doctor_visits;
+    if (next.counts) {
+      next.counts = {
+        initial_reports: 0,
+        monthly_records: 0,
+        doctor_visits: 0,
+        payments: 0,
+        family_meetings: 0,
+        monthly_photos: 0,
+        pickups: 0,
+      };
+    }
+    return next;
+  }
   if (r === 'psychologist') {
     return {
       ...pickFields(data, BASIC_STUDENT_FIELDS),

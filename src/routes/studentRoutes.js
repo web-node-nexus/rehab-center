@@ -22,7 +22,7 @@ const {
 } = require('../controllers/monthlyPhotoController');
 const { listPickups, createPickup } = require('../controllers/pickupController');
 const { authenticate } = require('../middlewares/auth');
-const { requirePermission, requireRoles } = require('../middlewares/authorize');
+const { requirePermission, requireAny, requireRoles } = require('../middlewares/authorize');
 const {
   uploadStudentWithReports,
   uploadDischargeImage,
@@ -68,9 +68,10 @@ router.get(
   requireRoles('admin', 'staff', 'doctor', 'psychologist'),
   getStudent
 );
+// Admin full manage OR staff admit
 router.post(
   '/',
-  requirePermission('students.manage'),
+  requireAny('students.manage', 'students.admit'),
   uploadStudentWithReports,
   createStudent
 );
@@ -82,7 +83,7 @@ router.post(
 );
 router.put(
   '/:id',
-  requirePermission('students.manage'),
+  requireAny('students.manage', 'students.admit'),
   uploadStudentWithReports,
   updateStudent
 );
