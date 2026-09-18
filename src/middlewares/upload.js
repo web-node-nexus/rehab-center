@@ -100,6 +100,12 @@ const uploadDischargeImage = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
 }).single('discharge_image');
 
+const uploadTeamPhoto = multer({
+  storage: makeStorage('team'),
+  fileFilter: imageFilter,
+  limits: { fileSize: 5 * 1024 * 1024 },
+}).single('photo');
+
 const uploadStudentWithReports = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
@@ -146,6 +152,7 @@ module.exports = {
   uploadPrescriptionPdf,
   uploadPrescriptionFiles,
   uploadDischargeImage,
+  uploadTeamPhoto,
   uploadStudentWithReports,
   uploadMonthlyPhoto,
   uploadReceiptImage,

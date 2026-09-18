@@ -22,6 +22,7 @@ const pickupRoutes = require('./src/routes/pickupRoutes');
 const psychologistReportRoutes = require('./src/routes/psychologistReportRoutes');
 const cashbookRoutes = require('./src/routes/cashbookRoutes');
 const adminRoutes = require('./src/routes/adminRoutes');
+const teamMemberRoutes = require('./src/routes/teamMemberRoutes');
 
 const app = express();
 
@@ -39,10 +40,11 @@ app.get('/api/health', (_req, res) => {
     const access = require('./src/utils/access');
     const authz = require('./src/middlewares/authorize');
     accessCheck = {
-      accessVersion: 'roles-v7-staff-admit-2026-09-18',
+      accessVersion: 'roles-v8-staff-discharge-team-2026-09-18',
       cwd: process.cwd(),
       staffStudents: access.can('staff', 'students'),
       staffInquiries: access.can('staff', 'inquiries'),
+      staffAdmit: access.can('staff', 'students.admit'),
       hasPermStaffStudents: authz.hasPermission('staff', 'students'),
       hasPermStaffInquiries: authz.hasPermission('staff', 'inquiries'),
       doctorStudents: access.can('doctor', 'students'),
@@ -72,7 +74,8 @@ app.get('/api/debug/whoami', require('./src/middlewares/auth').authenticate, (re
       resolvedRole: role,
       canStudents: hasPermission(role, 'students'),
       canInquiries: hasPermission(role, 'inquiries'),
-      accessVersion: 'roles-v7-staff-admit-2026-09-18',
+      canAdmit: hasPermission(role, 'students.admit'),
+      accessVersion: 'roles-v8-staff-discharge-team-2026-09-18',
     },
   });
 });
@@ -86,6 +89,7 @@ app.use('/api', pickupRoutes);
 app.use('/api', psychologistReportRoutes);
 app.use('/api', cashbookRoutes);
 app.use('/api', adminRoutes);
+app.use('/api', teamMemberRoutes);
 app.use('/api', initialReportRoutes);
 app.use('/api', monthlyRecordRoutes);
 app.use('/api', doctorVisitRoutes);

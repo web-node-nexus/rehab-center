@@ -11,6 +11,7 @@ const Pickup = require('./Pickup');
 const PsychologistReport = require('./PsychologistReport');
 const CashEntry = require('./CashEntry');
 const DeviceSession = require('./DeviceSession');
+const TeamMember = require('./TeamMember');
 
 Student.hasMany(InitialReport, {
   foreignKey: 'student_id',
@@ -91,6 +92,9 @@ User.hasMany(CashEntry, { foreignKey: 'added_by', as: 'cash_entries' });
 DeviceSession.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 User.hasMany(DeviceSession, { foreignKey: 'user_id', as: 'device_sessions' });
 
+TeamMember.belongsTo(User, { foreignKey: 'added_by', as: 'addedByUser' });
+User.hasMany(TeamMember, { foreignKey: 'added_by', as: 'team_members' });
+
 module.exports = {
   User,
   Student,
@@ -105,4 +109,5 @@ module.exports = {
   PsychologistReport,
   CashEntry,
   DeviceSession,
+  TeamMember,
 };

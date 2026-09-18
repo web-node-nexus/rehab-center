@@ -77,7 +77,7 @@ router.post(
 );
 router.post(
   '/:id/discharge',
-  requirePermission('students.manage'),
+  requireAny('students.manage', 'students.admit'),
   uploadDischargeImage,
   dischargeStudent
 );
