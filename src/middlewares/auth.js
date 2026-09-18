@@ -42,6 +42,7 @@ const authenticate = async (req, res, next) => {
     }
 
     req.user = user;
+    req.jwtRole = decoded.role || null;
     req.deviceId = deviceId || null;
     next();
   } catch (err) {

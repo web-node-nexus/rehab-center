@@ -37,11 +37,14 @@ app.get('/api/health', (_req, res) => {
   let accessCheck = {};
   try {
     const access = require('./src/utils/access');
+    const authz = require('./src/middlewares/authorize');
     accessCheck = {
-      accessVersion: 'roles-v4-hard-2026-09-18',
+      accessVersion: 'roles-v5-jwt-hard-2026-09-18',
       cwd: process.cwd(),
       staffStudents: access.can('staff', 'students'),
       staffInquiries: access.can('staff', 'inquiries'),
+      hasPermStaffStudents: authz.hasPermission('staff', 'students'),
+      hasPermStaffInquiries: authz.hasPermission('staff', 'inquiries'),
       doctorStudents: access.can('doctor', 'students'),
       psychStudents: access.can('psychologist', 'students'),
     };
@@ -52,6 +55,25 @@ app.get('/api/health', (_req, res) => {
     success: true,
     message: 'Rehab Center API is running',
     ...accessCheck,
+  });
+});
+
+// Auth debug — shows exactly what role the server resolves for this token
+app.get('/api/debug/whoami', require('./src/middlewares/auth').authenticate, (req, res) => {
+  const { resolveRole, hasPermission } = require('./src/middlewares/authorize');
+  const role = resolveRole(req);
+  res.json({
+    success: true,
+    data: {
+      id: req.user?.id,
+      email: req.user?.email,
+      dbRole: req.user?.role,
+      jwtRole: req.jwtRole,
+      resolvedRole: role,
+      canStudents: hasPermission(role, 'students'),
+      canInquiries: hasPermission(role, 'inquiries'),
+      accessVersion: 'roles-v5-jwt-hard-2026-09-18',
+    },
   });
 });
 

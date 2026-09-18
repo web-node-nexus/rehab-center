@@ -22,7 +22,7 @@ const {
 } = require('../controllers/monthlyPhotoController');
 const { listPickups, createPickup } = require('../controllers/pickupController');
 const { authenticate } = require('../middlewares/auth');
-const { requirePermission, requireAny } = require('../middlewares/authorize');
+const { requirePermission, requireRoles } = require('../middlewares/authorize');
 const {
   uploadStudentWithReports,
   uploadDischargeImage,
@@ -34,8 +34,12 @@ const router = express.Router();
 
 router.use(authenticate);
 
-// Staff/doctor/psych: list + view. Manage stays admin-only.
-router.get('/', requireAny('students', 'student.basic'), listStudents);
+// HARD role gate — staff/doctor/psych/admin can always list + view students
+router.get(
+  '/',
+  requireRoles('admin', 'staff', 'doctor', 'psychologist'),
+  listStudents
+);
 router.get('/:studentId/payments', requirePermission('payments'), listStudentPayments);
 router.post(
   '/:studentId/payments',
@@ -59,7 +63,11 @@ router.post(
 router.get('/:studentId/pickups', requirePermission('pickups'), listPickups);
 router.post('/:studentId/pickups', requirePermission('pickups'), createPickup);
 router.get('/:id/export-pdf', requirePermission('students.manage'), exportStudentPdf);
-router.get('/:id', requireAny('students', 'student.basic'), getStudent);
+router.get(
+  '/:id',
+  requireRoles('admin', 'staff', 'doctor', 'psychologist'),
+  getStudent
+);
 router.post(
   '/',
   requirePermission('students.manage'),

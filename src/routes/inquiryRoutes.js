@@ -6,12 +6,13 @@ const {
   deleteInquiry,
 } = require('../controllers/inquiryController');
 const { authenticate } = require('../middlewares/auth');
-const { requirePermission } = require('../middlewares/authorize');
+const { requireRoles } = require('../middlewares/authorize');
 
 const router = express.Router();
 
 router.use(authenticate);
-router.use(requirePermission('inquiries'));
+// HARD: only admin + staff for enquiry CRUD
+router.use(requireRoles('admin', 'staff'));
 
 router.get('/inquiries', listInquiries);
 router.post('/inquiries', createInquiry);

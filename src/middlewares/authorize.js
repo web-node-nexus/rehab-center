@@ -1,20 +1,46 @@
 const AppError = require('../utils/AppError');
 const { can, DENIED_MESSAGE, normalizeRole } = require('../utils/access');
 
-const resolveRole = (user) => {
+/**
+ * Resolve role from the request — JWT first (always reliable), then DB user.
+ * Never trust a single Sequelize getter alone.
+ */
+const resolveRole = (reqOrUser) => {
+  // Called as resolveRole(req)
+  if (reqOrUser && reqOrUser.user) {
+    const req = reqOrUser;
+    const fromJwt = req.jwtRole;
+    const user = req.user;
+    let fromDb = '';
+    try {
+      if (user) {
+        if (typeof user.get === 'function') fromDb = user.get('role');
+        if (!fromDb) fromDb = user.role;
+        if (!fromDb && user.dataValues) fromDb = user.dataValues.role;
+        if (!fromDb && typeof user.toJSON === 'function') fromDb = user.toJSON().role;
+      }
+    } catch (_) {
+      /* ignore */
+    }
+    return normalizeRole(fromJwt || fromDb || '');
+  }
+
+  // Called as resolveRole(user)
+  const user = reqOrUser;
   if (!user) return '';
-  // Sequelize model / plain object / dataValues — all covered
-  const raw =
-    user.role ??
-    user.dataValues?.role ??
-    (typeof user.get === 'function' ? user.get('role') : undefined) ??
-    '';
-  return normalizeRole(raw);
+  try {
+    let raw = '';
+    if (typeof user.get === 'function') raw = user.get('role');
+    if (!raw) raw = user.role;
+    if (!raw && user.dataValues) raw = user.dataValues.role;
+    return normalizeRole(raw || '');
+  } catch (_) {
+    return normalizeRole(user.role || '');
+  }
 };
 
-/** Absolute allow-lists so a stale ROLE_PERMISSIONS array can never lock staff out */
+/** Hard allow-lists — cannot be broken by stale ROLE_PERMISSIONS */
 const ROLE_ALLOW = {
-  admin: null, // all
   staff: new Set(['inquiries', 'students', 'student.basic', 'settings']),
   doctor: new Set([
     'home',
@@ -38,17 +64,29 @@ const hasPermission = (role, permission) => {
   const p = String(permission || '').trim();
   if (!r || !p) return false;
   if (r === 'admin') return true;
+
+  // Explicit hard gates (do not remove)
+  if (
+    (p === 'students' || p === 'student.basic') &&
+    (r === 'staff' || r === 'doctor' || r === 'psychologist')
+  ) {
+    return true;
+  }
+  if (p === 'inquiries' && r === 'staff') return true;
+  if (p === 'doctorReport' && r === 'doctor') return true;
+  if (p === 'psychologistReport' && r === 'psychologist') return true;
+
   if (ROLE_ALLOW[r]?.has(p)) return true;
-  // Fallback to access.js can()
   return can(r, p);
 };
 
 const requirePermission = (permission) => (req, res, next) => {
   try {
     if (!req.user) throw new AppError('Authentication required', 401);
-    const role = resolveRole(req.user);
+    const role = resolveRole(req);
     if (!hasPermission(role, permission)) {
-      throw new AppError(DENIED_MESSAGE, 403);
+      // Include role in message so phone/logs show what server saw
+      throw new AppError(`${DENIED_MESSAGE} [${role || 'no-role'}]`, 403);
     }
     next();
   } catch (err) {
@@ -59,14 +97,33 @@ const requirePermission = (permission) => (req, res, next) => {
 const requireAny = (...permissions) => (req, res, next) => {
   try {
     if (!req.user) throw new AppError('Authentication required', 401);
-    const role = resolveRole(req.user);
+    const role = resolveRole(req);
     if (permissions.some((permission) => hasPermission(role, permission))) {
       return next();
     }
-    throw new AppError(DENIED_MESSAGE, 403);
+    throw new AppError(`${DENIED_MESSAGE} [${role || 'no-role'}]`, 403);
   } catch (err) {
     next(err);
   }
 };
 
-module.exports = { requirePermission, requireAny, hasPermission, resolveRole };
+/** Role-based gate that ignores permission strings entirely */
+const requireRoles = (...roles) => (req, res, next) => {
+  try {
+    if (!req.user) throw new AppError('Authentication required', 401);
+    const role = resolveRole(req);
+    const allowed = roles.map((r) => normalizeRole(r));
+    if (role === 'admin' || allowed.includes(role)) return next();
+    throw new AppError(`${DENIED_MESSAGE} [${role || 'no-role'}]`, 403);
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = {
+  requirePermission,
+  requireAny,
+  requireRoles,
+  hasPermission,
+  resolveRole,
+};
