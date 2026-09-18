@@ -103,6 +103,11 @@ const me = async (req, res, next) => {
 
 const changePassword = async (req, res, next) => {
   try {
+    // Only admin may change passwords. Role users cannot change even their own.
+    if (req.user.role !== 'admin') {
+      throw new AppError('You are not authorized for this action', 403);
+    }
+
     const { current_password, new_password } = req.body;
     const user = await User.scope('withPassword').findByPk(req.user.id);
     if (!user) throw new AppError('User not found', 401);

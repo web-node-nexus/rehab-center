@@ -1,5 +1,12 @@
 const ROLES = ['admin', 'doctor', 'staff', 'psychologist'];
 
+/**
+ * Role matrix (source of truth):
+ * - admin: everything (students manage, payments, cashbook, all reports)
+ * - staff: enquiry CRUD + student basic details view only
+ * - doctor: students + medical + doctor visits/reports
+ * - psychologist: students basic + psychologist report only
+ */
 const ROLE_PERMISSIONS = {
   admin: 'all',
   doctor: [
@@ -77,8 +84,18 @@ const shapeStudentForRole = (data, role) => {
     return {
       ...pickFields(data, BASIC_STUDENT_FIELDS),
       psychologist_report: data.psychologist_report || null,
+      counts: {
+        initial_reports: 0,
+        monthly_records: 0,
+        doctor_visits: 0,
+        payments: 0,
+        family_meetings: 0,
+        monthly_photos: 0,
+        pickups: 0,
+      },
     };
   }
+  // doctor: medical + visits, never payments/fees
   const next = { ...data };
   delete next.agreed_fee;
   delete next.monthly_fee;
