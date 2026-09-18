@@ -34,7 +34,25 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.get('/api/health', (_req, res) => {
-  res.json({ success: true, message: 'Rehab Center API is running' });
+  let accessCheck = {};
+  try {
+    const access = require('./src/utils/access');
+    accessCheck = {
+      accessVersion: 'roles-v4-hard-2026-09-18',
+      cwd: process.cwd(),
+      staffStudents: access.can('staff', 'students'),
+      staffInquiries: access.can('staff', 'inquiries'),
+      doctorStudents: access.can('doctor', 'students'),
+      psychStudents: access.can('psychologist', 'students'),
+    };
+  } catch (err) {
+    accessCheck = { accessError: err.message };
+  }
+  res.json({
+    success: true,
+    message: 'Rehab Center API is running',
+    ...accessCheck,
+  });
 });
 
 app.use('/api/auth', authRoutes);
