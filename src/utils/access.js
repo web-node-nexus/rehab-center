@@ -1,11 +1,8 @@
 const ROLES = ['admin', 'doctor', 'staff', 'psychologist'];
 
 /**
- * Role matrix (source of truth):
- * - admin: everything (students manage, payments, cashbook, all reports)
- * - staff: enquiry CRUD + student basic details view only
- * - doctor: students + medical + doctor visits/reports
- * - psychologist: students basic + psychologist report only
+ * HARD role matrix — staff MUST be able to list/view students (basic) + inquiries.
+ * Admin = everything. Doctor = medical + visits. Psychologist = psych report.
  */
 const ROLE_PERMISSIONS = {
   admin: 'all',
@@ -22,6 +19,7 @@ const ROLE_PERMISSIONS = {
     'student.basic',
     'psychologistReport',
   ],
+  // Staff: enquiry CRUD + student basic view (list + detail). NEVER payments/manage.
   staff: ['inquiries', 'students', 'student.basic'],
 };
 
@@ -33,12 +31,43 @@ const TAB_PERMISSIONS = {
   Settings: 'settings',
 };
 
+const normalizeRole = (role) =>
+  String(role || '')
+    .trim()
+    .toLowerCase();
+
 const can = (role, permission) => {
-  if (!role || !permission) return false;
-  if (permission === 'settings') return true;
-  const granted = ROLE_PERMISSIONS[role];
+  const r = normalizeRole(role);
+  const p = String(permission || '').trim();
+  if (!r || !p) return false;
+  if (p === 'settings') return true;
+  if (r === 'admin') return true;
+
+  // Explicit hard checks so staff/doctor/psych never break if arrays drift
+  if (r === 'staff') {
+    return p === 'inquiries' || p === 'students' || p === 'student.basic';
+  }
+  if (r === 'doctor') {
+    return (
+      p === 'home' ||
+      p === 'students' ||
+      p === 'student.basic' ||
+      p === 'student.medical' ||
+      p === 'doctorReport'
+    );
+  }
+  if (r === 'psychologist') {
+    return (
+      p === 'home' ||
+      p === 'students' ||
+      p === 'student.basic' ||
+      p === 'psychologistReport'
+    );
+  }
+
+  const granted = ROLE_PERMISSIONS[r];
   if (granted === 'all') return true;
-  return Array.isArray(granted) && granted.includes(permission);
+  return Array.isArray(granted) && granted.includes(p);
 };
 
 const DENIED_MESSAGE = 'You are not authorized for this action';
@@ -78,9 +107,10 @@ const pickFields = (data, keys) => {
 };
 
 const shapeStudentForRole = (data, role) => {
-  if (!data || role === 'admin') return data;
-  if (role === 'staff') return pickFields(data, BASIC_STUDENT_FIELDS);
-  if (role === 'psychologist') {
+  const r = normalizeRole(role);
+  if (!data || r === 'admin') return data;
+  if (r === 'staff') return pickFields(data, BASIC_STUDENT_FIELDS);
+  if (r === 'psychologist') {
     return {
       ...pickFields(data, BASIC_STUDENT_FIELDS),
       psychologist_report: data.psychologist_report || null,
@@ -131,4 +161,5 @@ module.exports = {
   can,
   DENIED_MESSAGE,
   shapeStudentForRole,
+  normalizeRole,
 };

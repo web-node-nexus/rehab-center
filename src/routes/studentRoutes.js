@@ -22,7 +22,7 @@ const {
 } = require('../controllers/monthlyPhotoController');
 const { listPickups, createPickup } = require('../controllers/pickupController');
 const { authenticate } = require('../middlewares/auth');
-const { requirePermission } = require('../middlewares/authorize');
+const { requirePermission, requireAny } = require('../middlewares/authorize');
 const {
   uploadStudentWithReports,
   uploadDischargeImage,
@@ -34,7 +34,8 @@ const router = express.Router();
 
 router.use(authenticate);
 
-router.get('/', requirePermission('students'), listStudents);
+// Staff/doctor/psych: list + view. Manage stays admin-only.
+router.get('/', requireAny('students', 'student.basic'), listStudents);
 router.get('/:studentId/payments', requirePermission('payments'), listStudentPayments);
 router.post(
   '/:studentId/payments',
@@ -58,7 +59,7 @@ router.post(
 router.get('/:studentId/pickups', requirePermission('pickups'), listPickups);
 router.post('/:studentId/pickups', requirePermission('pickups'), createPickup);
 router.get('/:id/export-pdf', requirePermission('students.manage'), exportStudentPdf);
-router.get('/:id', requirePermission('students'), getStudent);
+router.get('/:id', requireAny('students', 'student.basic'), getStudent);
 router.post(
   '/',
   requirePermission('students.manage'),
