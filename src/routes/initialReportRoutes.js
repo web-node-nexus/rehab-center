@@ -10,11 +10,24 @@ const { uploadReportPdf } = require('../middlewares/upload');
 
 const router = express.Router();
 
-router.use(authenticate);
-router.use(requirePermission('btReport'));
-
-router.get('/students/:studentId/initial-reports', listInitialReports);
-router.post('/students/:studentId/initial-reports', uploadReportPdf, createInitialReport);
-router.delete('/initial-reports/:id', deleteInitialReport);
+router.get(
+  '/students/:studentId/initial-reports',
+  authenticate,
+  requirePermission('btReport'),
+  listInitialReports
+);
+router.post(
+  '/students/:studentId/initial-reports',
+  authenticate,
+  requirePermission('btReport'),
+  uploadReportPdf,
+  createInitialReport
+);
+router.delete(
+  '/initial-reports/:id',
+  authenticate,
+  requirePermission('btReport'),
+  deleteInitialReport
+);
 
 module.exports = router;

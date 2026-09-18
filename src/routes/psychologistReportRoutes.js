@@ -8,10 +8,17 @@ const { requirePermission } = require('../middlewares/authorize');
 
 const router = express.Router();
 
-router.use(authenticate);
-router.use(requirePermission('psychologistReport'));
-
-router.get('/students/:studentId/psychologist-report', getPsychologistReport);
-router.put('/students/:studentId/psychologist-report', upsertPsychologistReport);
+router.get(
+  '/students/:studentId/psychologist-report',
+  authenticate,
+  requirePermission('psychologistReport'),
+  getPsychologistReport
+);
+router.put(
+  '/students/:studentId/psychologist-report',
+  authenticate,
+  requirePermission('psychologistReport'),
+  upsertPsychologistReport
+);
 
 module.exports = router;

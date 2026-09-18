@@ -11,12 +11,31 @@ const { uploadMonthlyPdf } = require('../middlewares/upload');
 
 const router = express.Router();
 
-router.use(authenticate);
-router.use(requirePermission('monthlyTests'));
-
-router.get('/students/:studentId/monthly-records', listMonthlyRecords);
-router.post('/students/:studentId/monthly-records', uploadMonthlyPdf, createMonthlyRecord);
-router.put('/monthly-records/:id', uploadMonthlyPdf, updateMonthlyRecord);
-router.delete('/monthly-records/:id', deleteMonthlyRecord);
+router.get(
+  '/students/:studentId/monthly-records',
+  authenticate,
+  requirePermission('monthlyTests'),
+  listMonthlyRecords
+);
+router.post(
+  '/students/:studentId/monthly-records',
+  authenticate,
+  requirePermission('monthlyTests'),
+  uploadMonthlyPdf,
+  createMonthlyRecord
+);
+router.put(
+  '/monthly-records/:id',
+  authenticate,
+  requirePermission('monthlyTests'),
+  uploadMonthlyPdf,
+  updateMonthlyRecord
+);
+router.delete(
+  '/monthly-records/:id',
+  authenticate,
+  requirePermission('monthlyTests'),
+  deleteMonthlyRecord
+);
 
 module.exports = router;

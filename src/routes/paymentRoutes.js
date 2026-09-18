@@ -12,13 +12,30 @@ const { uploadReceiptImage } = require('../middlewares/upload');
 
 const router = express.Router();
 
-router.use(authenticate);
-router.use(requirePermission('payments'));
+// IMPORTANT: never router.use(requirePermission) here — this router is mounted at /api
+// and would block ALL /api/* traffic (students, inquiries, etc.) for non-admin roles.
 
-router.get('/payments', listAllPayments);
-router.get('/students/:studentId/payments', listStudentPayments);
-router.post('/students/:studentId/payments', uploadReceiptImage, createPayment);
-router.put('/payments/:id', uploadReceiptImage, updatePayment);
-router.delete('/payments/:id', deletePayment);
+router.get('/payments', authenticate, requirePermission('payments'), listAllPayments);
+router.get(
+  '/students/:studentId/payments',
+  authenticate,
+  requirePermission('payments'),
+  listStudentPayments
+);
+router.post(
+  '/students/:studentId/payments',
+  authenticate,
+  requirePermission('payments'),
+  uploadReceiptImage,
+  createPayment
+);
+router.put(
+  '/payments/:id',
+  authenticate,
+  requirePermission('payments'),
+  uploadReceiptImage,
+  updatePayment
+);
+router.delete('/payments/:id', authenticate, requirePermission('payments'), deletePayment);
 
 module.exports = router;

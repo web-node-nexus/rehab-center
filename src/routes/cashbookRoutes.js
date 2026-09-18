@@ -10,12 +10,9 @@ const { requirePermission } = require('../middlewares/authorize');
 
 const router = express.Router();
 
-router.use(authenticate);
-router.use(requirePermission('cashbook'));
-
-router.get('/cash-entries', listEntries);
-router.post('/cash-entries', createEntry);
-router.put('/cash-entries/:id', updateEntry);
-router.delete('/cash-entries/:id', deleteEntry);
+router.get('/cash-entries', authenticate, requirePermission('cashbook'), listEntries);
+router.post('/cash-entries', authenticate, requirePermission('cashbook'), createEntry);
+router.put('/cash-entries/:id', authenticate, requirePermission('cashbook'), updateEntry);
+router.delete('/cash-entries/:id', authenticate, requirePermission('cashbook'), deleteEntry);
 
 module.exports = router;

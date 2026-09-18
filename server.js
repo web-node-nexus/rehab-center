@@ -39,7 +39,7 @@ app.get('/api/health', (_req, res) => {
     const access = require('./src/utils/access');
     const authz = require('./src/middlewares/authorize');
     accessCheck = {
-      accessVersion: 'roles-v5-jwt-hard-2026-09-18',
+      accessVersion: 'roles-v6-router-scope-fix-2026-09-18',
       cwd: process.cwd(),
       staffStudents: access.can('staff', 'students'),
       staffInquiries: access.can('staff', 'inquiries'),
@@ -72,7 +72,7 @@ app.get('/api/debug/whoami', require('./src/middlewares/auth').authenticate, (re
       resolvedRole: role,
       canStudents: hasPermission(role, 'students'),
       canInquiries: hasPermission(role, 'inquiries'),
-      accessVersion: 'roles-v5-jwt-hard-2026-09-18',
+      accessVersion: 'roles-v6-router-scope-fix-2026-09-18',
     },
   });
 });

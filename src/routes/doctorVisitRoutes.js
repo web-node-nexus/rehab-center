@@ -11,12 +11,31 @@ const { uploadPrescriptionFiles } = require('../middlewares/upload');
 
 const router = express.Router();
 
-router.use(authenticate);
-router.use(requirePermission('doctorReport'));
-
-router.get('/students/:studentId/doctor-visits', listDoctorVisits);
-router.post('/students/:studentId/doctor-visits', uploadPrescriptionFiles, createDoctorVisit);
-router.put('/doctor-visits/:id', uploadPrescriptionFiles, updateDoctorVisit);
-router.delete('/doctor-visits/:id', deleteDoctorVisit);
+router.get(
+  '/students/:studentId/doctor-visits',
+  authenticate,
+  requirePermission('doctorReport'),
+  listDoctorVisits
+);
+router.post(
+  '/students/:studentId/doctor-visits',
+  authenticate,
+  requirePermission('doctorReport'),
+  uploadPrescriptionFiles,
+  createDoctorVisit
+);
+router.put(
+  '/doctor-visits/:id',
+  authenticate,
+  requirePermission('doctorReport'),
+  uploadPrescriptionFiles,
+  updateDoctorVisit
+);
+router.delete(
+  '/doctor-visits/:id',
+  authenticate,
+  requirePermission('doctorReport'),
+  deleteDoctorVisit
+);
 
 module.exports = router;
