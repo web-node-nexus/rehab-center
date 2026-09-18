@@ -157,6 +157,14 @@ const Student = sequelize.define(
       type: DataTypes.STRING(120),
       allowNull: true,
     },
+    pickup_by: {
+      type: DataTypes.STRING(120),
+      allowNull: true,
+    },
+    pickup_charges: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+    },
     status: {
       type: DataTypes.ENUM('active', 'discharged', 'inactive'),
       allowNull: false,

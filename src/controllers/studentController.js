@@ -44,6 +44,7 @@ const mapStudent = (student) => {
   data.agreed_fee = toMoneyOrNull(data.agreed_fee);
   data.monthly_fee = toMoneyOrNull(data.monthly_fee);
   data.admission_fee = toMoneyOrNull(data.admission_fee);
+  data.pickup_charges = toMoneyOrNull(data.pickup_charges);
   data.duration_months =
     data.duration_months == null ? null : Number(data.duration_months) || null;
   if (data.initial_reports) {
@@ -309,6 +310,8 @@ const createStudent = async (req, res, next) => {
         ),
       referred_by: body.referred_by || null,
       admitted_by: admittedBy,
+      pickup_by: parseOptionalText(body.pickup_by),
+      pickup_charges: parseMoneyField(body.pickup_charges) ?? null,
       status: body.status || 'active',
       discharge_date: body.discharge_date || null,
       notes: body.notes || null,
@@ -366,6 +369,10 @@ const updateStudent = async (req, res, next) => {
     if (body.father_name !== undefined) updates.father_name = parseOptionalText(body.father_name);
     if (body.mother_name !== undefined) updates.mother_name = parseOptionalText(body.mother_name);
     if (body.admitted_by !== undefined) updates.admitted_by = parseOptionalText(body.admitted_by);
+    if (body.pickup_by !== undefined) updates.pickup_by = parseOptionalText(body.pickup_by);
+    if (body.pickup_charges !== undefined) {
+      updates.pickup_charges = parseMoneyField(body.pickup_charges);
+    }
     applyFeeFields(body, updates);
 
     if (req.file) {

@@ -94,6 +94,7 @@ const BASIC_STUDENT_FIELDS = [
   'emergency_contact_relation',
   'emergency_contact_phone',
   'admitted_by',
+  'pickup_by',
   'created_at',
   'updated_at',
 ];
@@ -134,6 +135,7 @@ const shapeStudentForRole = (data, role) => {
   delete next.fee_ledger;
   delete next.payments;
   delete next.payment_totals;
+  delete next.pickup_charges;
   delete next.pickups;
   delete next.family_meetings;
   delete next.monthly_photos;

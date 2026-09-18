@@ -221,6 +221,10 @@ const exportStudentPdf = async (req, res, next) => {
     line(doc, 'Past Medical History', student.past_medical_history);
     line(doc, 'Current Medications', student.current_medications);
     line(doc, 'Admitted By', student.admitted_by);
+    line(doc, 'Pickup By', student.pickup_by);
+    if (student.pickup_charges != null && student.pickup_charges !== '') {
+      line(doc, 'Pickup Charges', `₹ ${student.pickup_charges}`);
+    }
     line(doc, 'Notes', student.notes);
 
     if (student.aadhar_image) {
