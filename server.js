@@ -40,13 +40,19 @@ app.get('/api/health', (_req, res) => {
     const access = require('./src/utils/access');
     const authz = require('./src/middlewares/authorize');
     accessCheck = {
-      accessVersion: 'roles-v8-staff-discharge-team-2026-09-18',
+      accessVersion: 'roles-v11-doctor-bt-multi-duty-2026-09-20',
       cwd: process.cwd(),
       staffStudents: access.can('staff', 'students'),
       staffInquiries: access.can('staff', 'inquiries'),
       staffAdmit: access.can('staff', 'students.admit'),
+      staffDoctorReport: access.can('staff', 'doctorReport'),
+      staffBtReport: access.can('staff', 'btReport'),
+      doctorBtReport: access.can('doctor', 'btReport'),
       hasPermStaffStudents: authz.hasPermission('staff', 'students'),
       hasPermStaffInquiries: authz.hasPermission('staff', 'inquiries'),
+      hasPermStaffDoctor: authz.hasPermission('staff', 'doctorReport'),
+      hasPermStaffBt: authz.hasPermission('staff', 'btReport'),
+      hasPermDoctorBt: authz.hasPermission('doctor', 'btReport'),
       doctorStudents: access.can('doctor', 'students'),
       psychStudents: access.can('psychologist', 'students'),
     };
@@ -75,7 +81,9 @@ app.get('/api/debug/whoami', require('./src/middlewares/auth').authenticate, (re
       canStudents: hasPermission(role, 'students'),
       canInquiries: hasPermission(role, 'inquiries'),
       canAdmit: hasPermission(role, 'students.admit'),
-      accessVersion: 'roles-v8-staff-discharge-team-2026-09-18',
+      canDoctorReport: hasPermission(role, 'doctorReport'),
+      canBtReport: hasPermission(role, 'btReport'),
+      accessVersion: 'roles-v11-doctor-bt-multi-duty-2026-09-20',
     },
   });
 });

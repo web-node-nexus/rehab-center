@@ -81,9 +81,10 @@ router.post(
   uploadDischargeImage,
   dischargeStudent
 );
+// Edit existing student — admin only (staff may admit + discharge, not edit)
 router.put(
   '/:id',
-  requireAny('students.manage', 'students.admit'),
+  requirePermission('students.manage'),
   uploadStudentWithReports,
   updateStudent
 );

@@ -46,6 +46,8 @@ const ROLE_ALLOW = {
     'students',
     'student.basic',
     'students.admit',
+    'doctorReport',
+    'btReport',
     'settings',
   ]),
   doctor: new Set([
@@ -54,6 +56,7 @@ const ROLE_ALLOW = {
     'student.basic',
     'student.medical',
     'doctorReport',
+    'btReport',
     'settings',
   ]),
   psychologist: new Set([
@@ -80,7 +83,8 @@ const hasPermission = (role, permission) => {
   }
   if (p === 'students.admit' && r === 'staff') return true;
   if (p === 'inquiries' && r === 'staff') return true;
-  if (p === 'doctorReport' && r === 'doctor') return true;
+  if (p === 'doctorReport' && (r === 'doctor' || r === 'staff')) return true;
+  if (p === 'btReport' && (r === 'staff' || r === 'doctor')) return true;
   if (p === 'psychologistReport' && r === 'psychologist') return true;
 
   if (ROLE_ALLOW[r]?.has(p)) return true;

@@ -38,7 +38,7 @@ const TeamMember = sequelize.define(
       allowNull: true,
     },
     duty: {
-      type: DataTypes.STRING(80),
+      type: DataTypes.TEXT,
       allowNull: true,
     },
     duty_other: {

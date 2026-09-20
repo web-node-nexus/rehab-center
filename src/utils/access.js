@@ -12,6 +12,7 @@ const ROLE_PERMISSIONS = {
     'student.basic',
     'student.medical',
     'doctorReport',
+    'btReport',
   ],
   psychologist: [
     'home',
@@ -19,8 +20,15 @@ const ROLE_PERMISSIONS = {
     'student.basic',
     'psychologistReport',
   ],
-  // Staff: enquiry + student list/view + admit (create/update). No payments module.
-  staff: ['inquiries', 'students', 'student.basic', 'students.admit'],
+  // Staff: enquiry + students + admit + doctor checkup + B.T / blood reports. No payments.
+  staff: [
+    'inquiries',
+    'students',
+    'student.basic',
+    'students.admit',
+    'doctorReport',
+    'btReport',
+  ],
 };
 
 const TAB_PERMISSIONS = {
@@ -49,7 +57,9 @@ const can = (role, permission) => {
       p === 'inquiries' ||
       p === 'students' ||
       p === 'student.basic' ||
-      p === 'students.admit'
+      p === 'students.admit' ||
+      p === 'doctorReport' ||
+      p === 'btReport'
     );
   }
   if (r === 'doctor') {
@@ -58,7 +68,8 @@ const can = (role, permission) => {
       p === 'students' ||
       p === 'student.basic' ||
       p === 'student.medical' ||
-      p === 'doctorReport'
+      p === 'doctorReport' ||
+      p === 'btReport'
     );
   }
   if (r === 'psychologist') {
@@ -116,23 +127,25 @@ const shapeStudentForRole = (data, role) => {
   const r = normalizeRole(role);
   if (!data || r === 'admin') return data;
   if (r === 'staff') {
-    // Staff can admit — return form fields, hide payment history / clinical modules
+    // Staff: admit + doctor visits + B.T reports; hide payments / psych / monthly modules
     const next = { ...data };
     delete next.payments;
     delete next.payment_totals;
     delete next.fee_ledger;
+    delete next.agreed_fee;
+    delete next.monthly_fee;
+    delete next.admission_fee;
+    delete next.pickup_charges;
     delete next.pickups;
     delete next.family_meetings;
     delete next.monthly_photos;
     delete next.psychologist_report;
-    delete next.initial_reports;
     delete next.monthly_records;
-    delete next.doctor_visits;
     if (next.counts) {
       next.counts = {
-        initial_reports: 0,
+        initial_reports: next.counts.initial_reports || 0,
         monthly_records: 0,
-        doctor_visits: 0,
+        doctor_visits: next.counts.doctor_visits || 0,
         payments: 0,
         family_meetings: 0,
         monthly_photos: 0,
@@ -156,7 +169,7 @@ const shapeStudentForRole = (data, role) => {
       },
     };
   }
-  // doctor: medical + visits, never payments/fees
+  // doctor: medical + visits + blood/BT reports, never payments/fees
   const next = { ...data };
   delete next.agreed_fee;
   delete next.monthly_fee;
@@ -170,11 +183,10 @@ const shapeStudentForRole = (data, role) => {
   delete next.family_meetings;
   delete next.monthly_photos;
   delete next.psychologist_report;
-  delete next.initial_reports;
   delete next.monthly_records;
   if (next.counts) {
     next.counts = {
-      initial_reports: 0,
+      initial_reports: next.counts.initial_reports || 0,
       monthly_records: 0,
       doctor_visits: next.counts.doctor_visits || 0,
       payments: 0,
