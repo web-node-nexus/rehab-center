@@ -40,19 +40,22 @@ app.get('/api/health', (_req, res) => {
     const access = require('./src/utils/access');
     const authz = require('./src/middlewares/authorize');
     accessCheck = {
-      accessVersion: 'roles-v11-doctor-bt-multi-duty-2026-09-20',
+      accessVersion: 'roles-v12-staff-full-no-pay-2026-09-24',
       cwd: process.cwd(),
       staffStudents: access.can('staff', 'students'),
       staffInquiries: access.can('staff', 'inquiries'),
       staffAdmit: access.can('staff', 'students.admit'),
       staffDoctorReport: access.can('staff', 'doctorReport'),
       staffBtReport: access.can('staff', 'btReport'),
+      staffPsych: access.can('staff', 'psychologistReport'),
+      staffPayments: access.can('staff', 'payments'),
+      doctorPayments: access.can('doctor', 'payments'),
+      psychPayments: access.can('psychologist', 'payments'),
       doctorBtReport: access.can('doctor', 'btReport'),
       hasPermStaffStudents: authz.hasPermission('staff', 'students'),
-      hasPermStaffInquiries: authz.hasPermission('staff', 'inquiries'),
-      hasPermStaffDoctor: authz.hasPermission('staff', 'doctorReport'),
-      hasPermStaffBt: authz.hasPermission('staff', 'btReport'),
-      hasPermDoctorBt: authz.hasPermission('doctor', 'btReport'),
+      hasPermStaffPsych: authz.hasPermission('staff', 'psychologistReport'),
+      hasPermStaffPayments: authz.hasPermission('staff', 'payments'),
+      hasPermDoctorPayments: authz.hasPermission('doctor', 'payments'),
       doctorStudents: access.can('doctor', 'students'),
       psychStudents: access.can('psychologist', 'students'),
     };
@@ -83,7 +86,9 @@ app.get('/api/debug/whoami', require('./src/middlewares/auth').authenticate, (re
       canAdmit: hasPermission(role, 'students.admit'),
       canDoctorReport: hasPermission(role, 'doctorReport'),
       canBtReport: hasPermission(role, 'btReport'),
-      accessVersion: 'roles-v11-doctor-bt-multi-duty-2026-09-20',
+      canPsychReport: hasPermission(role, 'psychologistReport'),
+      canPayments: hasPermission(role, 'payments'),
+      accessVersion: 'roles-v12-staff-full-no-pay-2026-09-24',
     },
   });
 });

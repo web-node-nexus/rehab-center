@@ -1,9 +1,14 @@
 const ROLES = ['admin', 'doctor', 'staff', 'psychologist'];
 
 /**
- * HARD role matrix — staff MUST be able to list/view students (basic) + inquiries.
- * Admin = everything. Doctor = medical + visits. Psychologist = psych report.
+ * Role matrix:
+ * - admin: everything (incl. payments)
+ * - staff: everything EXCEPT payments / cashbook / accounts.manage
+ * - doctor: medical + doctor visits + BT reports (no payments)
+ * - psychologist: psych report (no payments)
  */
+const STAFF_DENIED = new Set(['payments', 'cashbook', 'accounts.manage']);
+
 const ROLE_PERMISSIONS = {
   admin: 'all',
   doctor: [
@@ -20,14 +25,23 @@ const ROLE_PERMISSIONS = {
     'student.basic',
     'psychologistReport',
   ],
-  // Staff: enquiry + students + admit + doctor checkup + B.T / blood reports. No payments.
   staff: [
-    'inquiries',
+    'home',
     'students',
     'student.basic',
+    'student.medical',
+    'students.manage',
     'students.admit',
+    'inquiries',
     'doctorReport',
     'btReport',
+    'monthlyTests',
+    'psychologistReport',
+    'familyMeetings',
+    'monthlyPhotos',
+    'pickups',
+    'team.manage',
+    'settings',
   ],
 };
 
@@ -51,16 +65,13 @@ const can = (role, permission) => {
   if (p === 'settings') return true;
   if (r === 'admin') return true;
 
-  // Explicit hard checks so staff/doctor/psych never break if arrays drift
+  // Money modules — admin only (never staff/doctor/psych)
+  if (p === 'payments' || p === 'cashbook' || p === 'accounts.manage') {
+    return false;
+  }
+
   if (r === 'staff') {
-    return (
-      p === 'inquiries' ||
-      p === 'students' ||
-      p === 'student.basic' ||
-      p === 'students.admit' ||
-      p === 'doctorReport' ||
-      p === 'btReport'
-    );
+    return !STAFF_DENIED.has(p);
   }
   if (r === 'doctor') {
     return (
@@ -123,37 +134,34 @@ const pickFields = (data, keys) => {
   return out;
 };
 
+const stripPaymentFields = (data) => {
+  const next = { ...data };
+  delete next.payments;
+  delete next.payment_totals;
+  delete next.fee_ledger;
+  delete next.agreed_fee;
+  delete next.monthly_fee;
+  delete next.admission_fee;
+  delete next.duration_months;
+  delete next.pickup_charges;
+  if (next.counts) {
+    next.counts = {
+      ...next.counts,
+      payments: 0,
+    };
+  }
+  return next;
+};
+
 const shapeStudentForRole = (data, role) => {
   const r = normalizeRole(role);
   if (!data || r === 'admin') return data;
+
   if (r === 'staff') {
-    // Staff: admit + doctor visits + B.T reports; hide payments / psych / monthly modules
-    const next = { ...data };
-    delete next.payments;
-    delete next.payment_totals;
-    delete next.fee_ledger;
-    delete next.agreed_fee;
-    delete next.monthly_fee;
-    delete next.admission_fee;
-    delete next.pickup_charges;
-    delete next.pickups;
-    delete next.family_meetings;
-    delete next.monthly_photos;
-    delete next.psychologist_report;
-    delete next.monthly_records;
-    if (next.counts) {
-      next.counts = {
-        initial_reports: next.counts.initial_reports || 0,
-        monthly_records: 0,
-        doctor_visits: next.counts.doctor_visits || 0,
-        payments: 0,
-        family_meetings: 0,
-        monthly_photos: 0,
-        pickups: 0,
-      };
-    }
-    return next;
+    // Staff sees everything except payment / fee money fields
+    return stripPaymentFields(data);
   }
+
   if (r === 'psychologist') {
     return {
       ...pickFields(data, BASIC_STUDENT_FIELDS),
@@ -169,16 +177,9 @@ const shapeStudentForRole = (data, role) => {
       },
     };
   }
+
   // doctor: medical + visits + blood/BT reports, never payments/fees
-  const next = { ...data };
-  delete next.agreed_fee;
-  delete next.monthly_fee;
-  delete next.admission_fee;
-  delete next.duration_months;
-  delete next.fee_ledger;
-  delete next.payments;
-  delete next.payment_totals;
-  delete next.pickup_charges;
+  const next = stripPaymentFields(data);
   delete next.pickups;
   delete next.family_meetings;
   delete next.monthly_photos;
@@ -202,6 +203,7 @@ module.exports = {
   ROLES,
   ROLE_PERMISSIONS,
   TAB_PERMISSIONS,
+  STAFF_DENIED,
   can,
   DENIED_MESSAGE,
   shapeStudentForRole,

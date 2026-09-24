@@ -40,10 +40,10 @@ router.get(
   requireRoles('admin', 'staff', 'doctor', 'psychologist'),
   listStudents
 );
-router.get('/:studentId/payments', requirePermission('payments'), listStudentPayments);
+router.get('/:studentId/payments', requireRoles('admin'), listStudentPayments);
 router.post(
   '/:studentId/payments',
-  requirePermission('payments'),
+  requireRoles('admin'),
   uploadReceiptImage,
   createPayment
 );

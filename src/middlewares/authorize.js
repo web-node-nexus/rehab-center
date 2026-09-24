@@ -42,12 +42,21 @@ const resolveRole = (reqOrUser) => {
 /** Hard allow-lists — cannot be broken by stale ROLE_PERMISSIONS */
 const ROLE_ALLOW = {
   staff: new Set([
-    'inquiries',
+    'home',
     'students',
     'student.basic',
+    'student.medical',
+    'students.manage',
     'students.admit',
+    'inquiries',
     'doctorReport',
     'btReport',
+    'monthlyTests',
+    'psychologistReport',
+    'familyMeetings',
+    'monthlyPhotos',
+    'pickups',
+    'team.manage',
     'settings',
   ]),
   doctor: new Set([
@@ -74,17 +83,26 @@ const hasPermission = (role, permission) => {
   if (!r || !p) return false;
   if (r === 'admin') return true;
 
-  // Explicit hard gates (do not remove)
+  // HARD: payments / cash / accounts — admin only
+  if (p === 'payments' || p === 'cashbook' || p === 'accounts.manage') {
+    return false;
+  }
+
+  // Staff: everything except money (deny-list already applied above)
+  if (r === 'staff') {
+    if (ROLE_ALLOW.staff.has(p)) return true;
+    return can(r, p);
+  }
+
+  // Explicit hard gates
   if (
     (p === 'students' || p === 'student.basic') &&
-    (r === 'staff' || r === 'doctor' || r === 'psychologist')
+    (r === 'doctor' || r === 'psychologist')
   ) {
     return true;
   }
-  if (p === 'students.admit' && r === 'staff') return true;
-  if (p === 'inquiries' && r === 'staff') return true;
-  if (p === 'doctorReport' && (r === 'doctor' || r === 'staff')) return true;
-  if (p === 'btReport' && (r === 'staff' || r === 'doctor')) return true;
+  if (p === 'doctorReport' && r === 'doctor') return true;
+  if (p === 'btReport' && r === 'doctor') return true;
   if (p === 'psychologistReport' && r === 'psychologist') return true;
 
   if (ROLE_ALLOW[r]?.has(p)) return true;
@@ -96,7 +114,6 @@ const requirePermission = (permission) => (req, res, next) => {
     if (!req.user) throw new AppError('Authentication required', 401);
     const role = resolveRole(req);
     if (!hasPermission(role, permission)) {
-      // Include role in message so phone/logs show what server saw
       throw new AppError(`${DENIED_MESSAGE} [${role || 'no-role'}]`, 403);
     }
     next();

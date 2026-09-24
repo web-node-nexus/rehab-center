@@ -15,7 +15,9 @@ const AppError = require('../utils/AppError');
 const { toPublicUrl, calcAge, parsePagination, success } = require('../utils/helpers');
 const { parseMoneyField, parseOptionalText, parseIntField, computeMonthlyFee, computeGrandTotal, buildFeeLedger, toMoneyOrNull } = require('../utils/feeLedger');
 const { mapReport } = require('./psychologistReportController');
-const { shapeStudentForRole } = require('../utils/access');
+const { shapeStudentForRole, normalizeRole } = require('../utils/access');
+
+const isAdminUser = (req) => normalizeRole(req.jwtRole || req.user?.role) === 'admin';
 
 const applyFeeFields = (body, target) => {
   if (body.admission_fee !== undefined) target.admission_fee = parseMoneyField(body.admission_fee);
@@ -291,27 +293,29 @@ const createStudent = async (req, res, next) => {
       visiting_phone: body.visiting_phone || null,
       father_name: parseOptionalText(body.father_name),
       mother_name: parseOptionalText(body.mother_name),
-      agreed_fee:
-        computeGrandTotal(
-          parseMoneyField(body.monthly_fee),
-          parseMoneyField(body.admission_fee) ?? 0,
-          parseIntField(body.duration_months)
-        ) ??
-        parseMoneyField(body.agreed_fee) ??
-        null,
-      admission_fee: parseMoneyField(body.admission_fee) ?? null,
-      duration_months: parseIntField(body.duration_months) ?? null,
-      monthly_fee:
-        parseMoneyField(body.monthly_fee) ??
-        computeMonthlyFee(
-          parseMoneyField(body.agreed_fee),
-          parseMoneyField(body.admission_fee) ?? 0,
-          parseIntField(body.duration_months)
-        ),
+      agreed_fee: isAdminUser(req)
+        ? computeGrandTotal(
+            parseMoneyField(body.monthly_fee),
+            parseMoneyField(body.admission_fee) ?? 0,
+            parseIntField(body.duration_months)
+          ) ??
+          parseMoneyField(body.agreed_fee) ??
+          null
+        : null,
+      admission_fee: isAdminUser(req) ? parseMoneyField(body.admission_fee) ?? null : null,
+      duration_months: isAdminUser(req) ? parseIntField(body.duration_months) ?? null : null,
+      monthly_fee: isAdminUser(req)
+        ? parseMoneyField(body.monthly_fee) ??
+          computeMonthlyFee(
+            parseMoneyField(body.agreed_fee),
+            parseMoneyField(body.admission_fee) ?? 0,
+            parseIntField(body.duration_months)
+          )
+        : null,
       referred_by: body.referred_by || null,
       admitted_by: admittedBy,
       pickup_by: parseOptionalText(body.pickup_by),
-      pickup_charges: parseMoneyField(body.pickup_charges) ?? null,
+      pickup_charges: isAdminUser(req) ? parseMoneyField(body.pickup_charges) ?? null : null,
       status: body.status || 'active',
       discharge_date: body.discharge_date || null,
       notes: body.notes || null,
@@ -370,10 +374,19 @@ const updateStudent = async (req, res, next) => {
     if (body.mother_name !== undefined) updates.mother_name = parseOptionalText(body.mother_name);
     if (body.admitted_by !== undefined) updates.admitted_by = parseOptionalText(body.admitted_by);
     if (body.pickup_by !== undefined) updates.pickup_by = parseOptionalText(body.pickup_by);
-    if (body.pickup_charges !== undefined) {
-      updates.pickup_charges = parseMoneyField(body.pickup_charges);
+
+    if (isAdminUser(req)) {
+      if (body.pickup_charges !== undefined) {
+        updates.pickup_charges = parseMoneyField(body.pickup_charges);
+      }
+      applyFeeFields(body, updates);
+    } else {
+      delete updates.pickup_charges;
+      delete updates.agreed_fee;
+      delete updates.monthly_fee;
+      delete updates.admission_fee;
+      delete updates.duration_months;
     }
-    applyFeeFields(body, updates);
 
     if (req.file) {
       updates.profile_image = `uploads/profiles/${req.file.filename}`;

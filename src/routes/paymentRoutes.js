@@ -7,35 +7,24 @@ const {
   deletePayment,
 } = require('../controllers/paymentController');
 const { authenticate } = require('../middlewares/auth');
-const { requirePermission } = require('../middlewares/authorize');
+const { requireRoles } = require('../middlewares/authorize');
 const { uploadReceiptImage } = require('../middlewares/upload');
 
 const router = express.Router();
 
 // IMPORTANT: never router.use(requirePermission) here — this router is mounted at /api
-// and would block ALL /api/* traffic (students, inquiries, etc.) for non-admin roles.
+// Payments: ADMIN ONLY (view / add / edit / delete)
+const adminOnly = [authenticate, requireRoles('admin')];
 
-router.get('/payments', authenticate, requirePermission('payments'), listAllPayments);
-router.get(
-  '/students/:studentId/payments',
-  authenticate,
-  requirePermission('payments'),
-  listStudentPayments
-);
+router.get('/payments', ...adminOnly, listAllPayments);
+router.get('/students/:studentId/payments', ...adminOnly, listStudentPayments);
 router.post(
   '/students/:studentId/payments',
-  authenticate,
-  requirePermission('payments'),
+  ...adminOnly,
   uploadReceiptImage,
   createPayment
 );
-router.put(
-  '/payments/:id',
-  authenticate,
-  requirePermission('payments'),
-  uploadReceiptImage,
-  updatePayment
-);
-router.delete('/payments/:id', authenticate, requirePermission('payments'), deletePayment);
+router.put('/payments/:id', ...adminOnly, uploadReceiptImage, updatePayment);
+router.delete('/payments/:id', ...adminOnly, deletePayment);
 
 module.exports = router;
